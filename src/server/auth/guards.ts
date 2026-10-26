@@ -2,12 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import type { Role } from "@/lib/roles";
+import { hasPermission, type Capability, type Permission, type Role } from "@/lib/roles";
 
 export type SessionUser = {
   id: string;
   name: string;
   role: Role;
+  permissions: Permission[];
+  capabilities: Capability[];
   mustChangePassword: boolean;
 };
 
@@ -33,5 +35,11 @@ export async function requireUser(
 export async function requireRole(...roles: Role[]): Promise<SessionUser> {
   const user = await requireUser();
   if (!roles.includes(user.role)) redirect("/denied");
+  return user;
+}
+
+export async function requirePermission(permission: Permission): Promise<SessionUser> {
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
+  if (!hasPermission(user, permission)) redirect("/denied");
   return user;
 }

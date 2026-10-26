@@ -107,6 +107,14 @@
   --sidebar-ring: #d99e56;
 }
 
+/* Keep brand fills (cards, labels) when printing. */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

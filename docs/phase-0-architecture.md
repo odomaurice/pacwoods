@@ -427,9 +427,13 @@ redirects ✔ shadcn/ui + Hugeicons ✔ role shells ✔ Vitest + test database �
 Super Admin bootstrap script · ☐ `requireCapability` / `requireOwnClient`
 (arrive with jobs, Phase 2–4) ☐ Playwright ☐ CI.
 
-**Phase 2 (users and jobs):** ☐ user provisioning per role with temp passwords
-☐ suspend/deactivate/revoke ☐ client numbers + printable client card ☐ work
-number counter ☐ job create/edit ☐ material catalogue ☐ audit log service.
+**Phase 2 (users and jobs):** ✔ provisioning per role with one-time temporary
+passwords ✔ suspend / reactivate / deactivate / reset / sign out everywhere ✔
+client numbers (transactional with the account) + printable client card with QR
+✔ work-number counter (per year) ✔ job create / edit-while-draft ✔ material
+catalogue (Super Admin edits, retire not delete) ✔ audit log page ✔ role
+sidebars. Operator capabilities live on the user document rather than a
+separate operatorProfiles collection; one fewer join, same rules.
 
 **Phase 3 (cutlist):** ☐ cutlist editor (parts, stock, options, edges) ☐ engine
 + validators + property tests ☐ SVG plan viewer ☐ calculations + estimates ☐

@@ -8,6 +8,7 @@ import {
   bootstrapSuperAdmin,
   changePassword,
   provisionAccount,
+  provisionClient,
 } from "@/server/services/users";
 import { connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
 
@@ -41,17 +42,17 @@ describe.skipIf(!hasDatabase)("accounts (MongoDB)", () => {
   });
 
   it("allows many phone-only clients but no duplicate phone numbers", async () => {
-    const a = await provisionAccount(superAdmin, { role: "CLIENT", name: "A", phone: "+2348000000001" });
-    const b = await provisionAccount(superAdmin, { role: "CLIENT", name: "B", phone: "+2348000000002" });
+    const a = await provisionClient(superAdmin, { name: "A", phone: "+2348000000001" });
+    const b = await provisionClient(superAdmin, { name: "B", phone: "+2348000000002" });
     expect(a.user.email).toBeUndefined();
     expect(b.user.email).toBeUndefined();
     await expect(
-      provisionAccount(superAdmin, { role: "CLIENT", name: "C", phone: "+234 800 000 0001" }),
+      provisionClient(superAdmin, { name: "C", phone: "+234 800 000 0001" }),
     ).rejects.toMatchObject({ code: "DUPLICATE" });
   });
 
   it("rejects accounts with no phone and no email", async () => {
-    await expect(provisionAccount(superAdmin, { role: "CLIENT", name: "Nobody" })).rejects.toBeInstanceOf(
+    await expect(provisionClient(superAdmin, { name: "Nobody" })).rejects.toBeInstanceOf(
       ServiceError,
     );
   });
@@ -67,8 +68,7 @@ describe.skipIf(!hasDatabase)("accounts (MongoDB)", () => {
   });
 
   it("changing the password clears the flag and revokes sessions", async () => {
-    const { user, temporaryPassword } = await provisionAccount(superAdmin, {
-      role: "CLIENT",
+    const { user, temporaryPassword } = await provisionClient(superAdmin, {
       name: "Client",
       email: "client@example.com",
     });

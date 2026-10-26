@@ -4,7 +4,7 @@ import { requireRole } from "@/server/auth/guards";
 export default async function OperatorLayout({ children }: LayoutProps<"/operator">) {
   const user = await requireRole("OPERATOR");
   return (
-    <AppShell user={user} nav={[{ href: "/operator", label: "My queue" }]}>
+    <AppShell user={user}>
       {children}
     </AppShell>
   );

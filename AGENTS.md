@@ -19,6 +19,10 @@ survives regeneration. The architecture, domain model and open questions are in
 - Business rules (queues, transitions, permissions, the cutting engine) need
   automated tests, not a manual click-through.
 - Claims about layout or interaction need a browser, not a typecheck.
+- Unit tests do not exercise Auth.js itself. After touching `src/auth.ts`,
+  sign in for real (`next start` with `AUTH_URL` set, then POST to
+  `/api/auth/callback/credentials`): values returned from `authorize` must be
+  structured-cloneable, so no Mongoose arrays or documents.
 
 ## Naming
 
@@ -49,7 +53,9 @@ business owner. Leave a marked gap and ask.
   text on white (2.34:1); use gold-deep `#8A5A1C` there.
 - Poppins only. Hugeicons only, no second icon set.
 - shadcn/ui components are added with `npx shadcn@latest add <name>`; the CLI
-  is not a project dependency.
+  is not a project dependency. It writes `import { cn } from "cn"` and installs
+  an unrelated npm package called `cn`: afterwards, point the import at
+  `@/lib/utils` and `npm uninstall cn`.
 - No decorative gradients, glows or fake charts.
 
 ## Assets

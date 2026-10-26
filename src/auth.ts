@@ -2,7 +2,7 @@ import NextAuth, { CredentialsSignin, type User as AuthUser } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { parseIdentifier } from "@/lib/identity";
 import { signInSchema } from "@/lib/password-policy";
-import type { Role } from "@/lib/roles";
+import type { Capability, Permission, Role } from "@/lib/roles";
 import { dummyPasswordHash, verifyPassword } from "@/server/auth/password";
 import {
   LOGIN_LIMIT_PER_ACCOUNT,
@@ -18,6 +18,8 @@ import { audit } from "@/server/services/audit";
 declare module "next-auth" {
   interface User {
     role: Role;
+    permissions: Permission[];
+    capabilities: Capability[];
     mustChangePassword: boolean;
     sessionVersion: number;
   }
@@ -26,6 +28,8 @@ declare module "next-auth" {
       id: string;
       name: string;
       role: Role;
+      permissions: Permission[];
+      capabilities: Capability[];
       mustChangePassword: boolean;
     };
   }
@@ -35,6 +39,8 @@ declare module "@auth/core/jwt" {
   interface JWT {
     uid: string;
     role: Role;
+    permissions: Permission[];
+    capabilities: Capability[];
     mustChangePassword: boolean;
     sessionVersion: number;
   }
@@ -97,6 +103,9 @@ async function authorize(raw: unknown, request: Request): Promise<AuthUser> {
     id: user._id.toString(),
     name: user.name,
     role: user.role,
+    // Plain arrays: Auth.js structured-clones this object, and Mongoose arrays cannot be cloned.
+    permissions: [...user.permissions] as Permission[],
+    capabilities: [...user.capabilities] as Capability[],
     mustChangePassword: user.mustChangePassword,
     sessionVersion: user.sessionVersion,
   };
@@ -118,6 +127,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ...token,
           uid: user.id!,
           role: user.role,
+          permissions: user.permissions,
+          capabilities: user.capabilities,
           mustChangePassword: user.mustChangePassword,
           sessionVersion: user.sessionVersion,
         };
@@ -127,7 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // everywhere" apply immediately rather than when the token expires.
       await connectDb();
       const current = await User.findById(token.uid)
-        .select("role status mustChangePassword sessionVersion")
+        .select("role permissions capabilities status mustChangePassword sessionVersion")
         .lean();
       if (
         !current ||
@@ -136,7 +147,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       ) {
         return null;
       }
-      return { ...token, role: current.role, mustChangePassword: current.mustChangePassword };
+      return {
+        ...token,
+        role: current.role,
+        permissions: current.permissions as Permission[],
+        capabilities: current.capabilities as Capability[],
+        mustChangePassword: current.mustChangePassword,
+      };
     },
     session({ session, token }) {
       session.user = {
@@ -144,6 +161,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         id: token.uid,
         name: token.name ?? "",
         role: token.role,
+        permissions: token.permissions,
+        capabilities: token.capabilities,
         mustChangePassword: token.mustChangePassword,
       };
       return session;

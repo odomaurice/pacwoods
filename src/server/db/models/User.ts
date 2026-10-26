@@ -1,8 +1,8 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 import { CAPABILITIES, PERMISSIONS, ROLES } from "@/lib/roles";
+import { USER_STATUSES } from "@/lib/schemas";
 
-export const USER_STATUSES = ["ACTIVE", "SUSPENDED", "DEACTIVATED"] as const;
-export type UserStatus = (typeof USER_STATUSES)[number];
+export { USER_STATUSES, type UserStatus } from "@/lib/schemas";
 
 const userSchema = new Schema(
   {
