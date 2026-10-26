@@ -5,6 +5,7 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
+import { notifyForJobEvent } from "@/server/services/notifications";
 import { ServiceError } from "@/server/services/users";
 
 /**
@@ -54,12 +55,14 @@ export async function transitionJob(
   );
   if (!updated) throw new ServiceError("CONFLICT", "The job changed while you were working. Reload and try again.");
   await JobStatusEvent.create([{ jobId, from, to, ...event }], { session });
+  await notifyForJobEvent(jobId, event.type, event.clientVisible ?? true, session);
   return updated;
 }
 
 /** A timeline entry that does not change status (creation, plan generated…). */
 export async function recordJobEvent(jobId: Types.ObjectId, event: EventInfo, session?: ClientSession) {
   await JobStatusEvent.create([{ jobId, ...event }], { session });
+  await notifyForJobEvent(jobId, event.type, event.clientVisible ?? true, session);
 }
 
 /**

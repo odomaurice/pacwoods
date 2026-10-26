@@ -21,13 +21,15 @@ type Props = {
   totalPanels: number;
   /** In the queue list: only the start/resume control, details are on the job page. */
   startOnly?: boolean;
+  /** Completion needs at least one photo of the finished work. */
+  finishedPhotos?: number;
 };
 
 /**
  * The operator's controls for one task. Every action asks first, and the
  * server re-checks everything; a disabled button always says why.
  */
-export default function TaskActions({ taskId, workNumber, stage, status, canStart, reason, totalPanels, startOnly = false }: Props) {
+export default function TaskActions({ taskId, workNumber, stage, status, canStart, reason, totalPanels, startOnly = false, finishedPhotos = 0 }: Props) {
   const router = useRouter();
   const word = STAGE_LABELS[stage].toLowerCase();
 
@@ -58,13 +60,16 @@ export default function TaskActions({ taskId, workNumber, stage, status, canStar
         )}
         {status === "IN_PROGRESS" && (
           <>
-            <CompleteButton taskId={taskId} workNumber={workNumber} word={word} totalPanels={totalPanels} run={run} />
+            <CompleteButton taskId={taskId} workNumber={workNumber} word={word} totalPanels={totalPanels} run={run} disabled={finishedPhotos === 0} />
             <PauseButton taskId={taskId} workNumber={workNumber} word={word} run={run} />
           </>
         )}
         {status !== "COMPLETED" && !startOnly && <ReportIssueButton large target={{ kind: "task", taskId }} workNumber={workNumber} />}
       </div>
       {!canStart && reason && status !== "IN_PROGRESS" && <p className="text-sm text-muted-foreground">{reason}</p>}
+      {status === "IN_PROGRESS" && finishedPhotos === 0 && (
+        <p className="text-sm font-medium text-brand-gold-deep">Add at least one photo of the finished work (below) before completing.</p>
+      )}
     </div>
   );
 }
@@ -94,7 +99,7 @@ function PauseButton({ taskId, workNumber, word, run }: { taskId: string; workNu
   );
 }
 
-function CompleteButton({ taskId, workNumber, word, totalPanels, run }: { taskId: string; workNumber: string; word: string; totalPanels: number; run: Run }) {
+function CompleteButton({ taskId, workNumber, word, totalPanels, run, disabled }: { taskId: string; workNumber: string; word: string; totalPanels: number; run: Run; disabled: boolean }) {
   const [values, setValues] = useState({ quantityCompleted: String(totalPanels), wastePanels: "0", defectivePanels: "0", downtimeMin: "0", notes: "" });
   const field = (key: keyof typeof values, label: string) => (
     <span className="block space-y-1">
@@ -105,6 +110,7 @@ function CompleteButton({ taskId, workNumber, word, totalPanels, run }: { taskId
   return (
     <ConfirmAction
       large
+      disabled={disabled}
       label={`Complete ${word}`}
       title={`Complete ${word} for ${workNumber}?`}
       description={

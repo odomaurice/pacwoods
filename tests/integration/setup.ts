@@ -6,7 +6,9 @@ import { AuthThrottle } from "@/server/db/models/AuthThrottle";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { CutlistVersion } from "@/server/db/models/CutlistVersion";
 import { Issue } from "@/server/db/models/Issue";
+import { Photo } from "@/server/db/models/Photo";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
+import { Notification } from "@/server/db/models/Notification";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { Job } from "@/server/db/models/Job";
@@ -29,10 +31,27 @@ export async function connectTestDb() {
   if (process.env.MONGODB_DB === "pacwoods") throw new Error("Refusing to test against the main database");
   await connectDb();
   await dropAllCollections();
-  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue]) await model.syncIndexes();
+  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue, Photo, Notification]) await model.syncIndexes();
 }
 
 export async function disconnectTestDb() {
   await dropAllCollections();
   await mongoose.disconnect();
+}
+
+/** Records a finished-work photo for a stage, as completion now requires. */
+export async function addFinishedPhoto(taskId: string, operatorId: string) {
+  const { ProductionTask } = await import("@/server/db/models/ProductionTask");
+  const task = await ProductionTask.findById(taskId).lean();
+  await Photo.create({
+    jobId: task!.jobId,
+    workNumber: task!.workNumber,
+    taskId: task!._id,
+    kind: "FINISHED",
+    storage: "gridfs",
+    fileId: new mongoose.Types.ObjectId(),
+    thumbId: new mongoose.Types.ObjectId(),
+    uploadedBy: operatorId,
+    uploaderRole: "OPERATOR",
+  });
 }

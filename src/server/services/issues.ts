@@ -8,6 +8,7 @@ import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
+import { notify } from "@/server/services/notifications";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 import { recordJobEvent } from "@/server/workflow/transitions";
 
@@ -68,6 +69,11 @@ export async function resolveIssue(actor: Actor, issueId: string, resolution: st
   );
   if (!issue) throw new ServiceError("CONFLICT", "This issue is already resolved.");
   await recordJobEvent(issue.jobId, { type: "ISSUE_RESOLVED", actorId: actor.id, note: text.data, clientVisible: issue.reporterRole === "CLIENT" });
+  await notify([issue.reportedBy], {
+    title: `Your report on ${issue.workNumber} is resolved`,
+    body: text.data,
+    href: issue.reporterRole === "CLIENT" ? `/client/jobs/${issue.workNumber}` : "/operator",
+  });
   await audit({ actorId: actor.id, action: "issue.resolved", targetType: "Issue", targetId: issue._id });
   return issue;
 }

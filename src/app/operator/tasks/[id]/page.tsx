@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import JobPhotos from "@/components/photos/JobPhotos";
 import JobSummaryCard from "@/components/production/JobSummaryCard";
 import { buttonVariants } from "@/components/ui/button";
 import TaskActions from "@/components/production/TaskActions";
 import TaskDetail from "@/components/production/TaskDetail";
 import { STAGE_LABELS } from "@/lib/production";
 import { requireRole } from "@/server/auth/guards";
+import { Photo } from "@/server/db/models/Photo";
 import { getJobCardData, scanUrl } from "@/server/services/jobCards";
 import { loadTaskView } from "@/server/services/taskView";
 
@@ -22,6 +24,7 @@ export default async function OperatorTaskPage({ params }: PageProps<"/operator/
   const { task, job, rule, props, totalPanels } = view;
   const mine = task.assignedOperatorId?.toString() === user.id;
   const card = await getJobCardData(task.workNumber);
+  const finishedPhotos = await Photo.countDocuments({ taskId: task._id, kind: "FINISHED" });
 
   return (
     <>
@@ -52,9 +55,13 @@ export default async function OperatorTaskPage({ params }: PageProps<"/operator/
             canStart={rule?.canStart ?? false}
             reason={rule?.reason}
             totalPanels={totalPanels}
+            finishedPhotos={finishedPhotos}
           />
         </div>
       )}
+      <div className="mb-6">
+        <JobPhotos jobId={job._id} viewer={user} />
+      </div>
       <TaskDetail {...props} />
     </>
   );

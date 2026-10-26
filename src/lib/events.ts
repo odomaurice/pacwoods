@@ -18,6 +18,8 @@ export const EVENT_LABELS: Record<string, string> = {
   JOB_COMPLETED: "Job completed",
   ISSUE_REPORTED: "Issue reported",
   ISSUE_RESOLVED: "Issue resolved",
+  MATERIAL_PHOTO_ADDED: "Photo of the wood added",
+  FINISHED_PHOTO_ADDED: "Photo of finished work added",
 };
 
 export function eventLabel(type: string) {

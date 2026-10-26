@@ -7,10 +7,12 @@ export type { CompletionInput };
 import { connectDb } from "@/server/db/connect";
 import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
+import { Photo } from "@/server/db/models/Photo";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
+import { notify } from "@/server/services/notifications";
 import { ServiceError, type Actor } from "@/server/services/users";
 import { recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
@@ -79,6 +81,7 @@ export async function assignOperator(actor: Actor, taskId: string, operatorId: s
       },
       session,
     );
+    await notify([operator], { title: `${STAGE_WORD[task.stage as Stage]} of ${task.workNumber} is assigned to you`, href: `/operator/tasks/${task._id}` }, session);
   });
   await audit({ actorId: actor.id, action: "task.assigned", targetType: "ProductionTask", targetId: taskId, meta: { operatorId } });
 }
@@ -185,6 +188,9 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
     const task = await loadTask(taskId, session);
     const job = await Job.findById(task.jobId).session(session).lean();
     if (!job) throw new ServiceError("NOT_FOUND", "Job not found.");
+    // Proof of the finished work is required before a stage can be completed.
+    const proof = await Photo.exists({ taskId: task._id, kind: "FINISHED" }).session(session);
+    if (!proof) throw new ServiceError("CONFLICT", "Add at least one photo of the finished work before completing.");
     const now = new Date();
 
     const r = await ProductionTask.updateOne(

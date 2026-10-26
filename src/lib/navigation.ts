@@ -5,6 +5,7 @@ import {
   WorkHistoryIcon,
   ListViewIcon,
   IdentityCardIcon,
+  Notification01Icon,
   Layers01Icon,
   Note01Icon,
   Task01Icon,
@@ -22,7 +23,13 @@ export type NavSection = { title?: string; items: NavItem[] };
  * Sidebar entries per role. Only pages that exist are listed; later phases add
  * queues, cutlists, reports and the rest.
  */
-export function navigationFor(user: { role: Role; permissions: readonly Permission[] }, counts: { openIssues?: number } = {}): NavSection[] {
+export function navigationFor(user: { role: Role; permissions: readonly Permission[] }, counts: { openIssues?: number; unread?: number } = {}): NavSection[] {
+  const sections = baseNavigation(user, counts);
+  sections.push({ items: [{ href: "/notifications", label: "Notifications", icon: Notification01Icon, badge: counts.unread || undefined }] });
+  return sections;
+}
+
+function baseNavigation(user: { role: Role; permissions: readonly Permission[] }, counts: { openIssues?: number }): NavSection[] {
   switch (user.role) {
     case "SUPER_ADMIN":
     case "ADMIN": {
@@ -65,7 +72,8 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
       return [
         {
           items: [
-            { href: "/client", label: "My jobs", icon: Briefcase01Icon },
+            { href: "/client", label: "Overview", icon: DashboardSquare01Icon },
+            { href: "/client/jobs", label: "My jobs", icon: Briefcase01Icon },
             { href: "/client/card", label: "My card", icon: IdentityCardIcon },
           ],
         },

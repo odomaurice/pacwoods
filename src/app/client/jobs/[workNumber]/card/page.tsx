@@ -29,7 +29,7 @@ export default async function ClientJobCardPage({ params }: PageProps<"/client/j
   return (
     <div className="space-y-6">
       <div className="flex gap-2 print:hidden">
-        <Link href="/client" className={buttonVariants({ variant: "outline" })}>
+        <Link href="/client/jobs" className={buttonVariants({ variant: "outline" })}>
           Back to my jobs
         </Link>
         <PrintButton label="Print job card" />

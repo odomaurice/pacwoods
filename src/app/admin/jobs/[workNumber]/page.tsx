@@ -6,6 +6,7 @@ import Detail from "@/components/Detail";
 import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
 import PageHeader from "@/components/PageHeader";
 import IssueList from "@/components/issues/IssueList";
+import JobPhotos from "@/components/photos/JobPhotos";
 import JobProduction from "@/components/production/JobProduction";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -31,7 +32,7 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeS
 const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
 
 export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNumber]">) {
-  await requireRole("SUPER_ADMIN", "ADMIN");
+  const viewer = await requireRole("SUPER_ADMIN", "ADMIN");
   const { workNumber } = await params;
   if (!WORK_NUMBER_PATTERN.test(workNumber)) notFound();
   const [found, cutlists] = await Promise.all([getJobByWorkNumber(workNumber), loadJobCutlist(workNumber)]);
@@ -131,6 +132,10 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
       )}
 
       <JobProduction jobId={job._id} />
+
+      <div className="mb-8">
+        <JobPhotos jobId={job._id} viewer={viewer} />
+      </div>
 
       <section className="mb-8 rounded-lg bg-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

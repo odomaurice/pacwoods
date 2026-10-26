@@ -62,9 +62,9 @@ export async function clientJobView(clientUserId: string, workNumber: string) {
       at: cut?.firstStartedAt ?? undefined,
       detail: [stageDetail(cut, "Cutting"), ahead !== undefined ? `${ahead} job${ahead === 1 ? "" : "s"} ahead in the cutting queue` : undefined].filter(Boolean).join(" · "),
     },
-    { key: "cut-done", label: "Cutting completed", done: cut?.status === "COMPLETED", at: cut?.completedAt ?? undefined },
+    { key: "cut-done", label: "Cutting completed", done: cut?.status === "COMPLETED", at: cut?.completedAt ?? undefined, detail: stageDetail(cut, "Cutting") },
     { key: "edge-start", label: "Edging started", done: Boolean(edge?.firstStartedAt), at: edge?.firstStartedAt ?? undefined, detail: edging ? stageDetail(edge, "Edging") : undefined, na: !edging },
-    { key: "edge-done", label: "Edging completed", done: edge?.status === "COMPLETED", at: edge?.completedAt ?? undefined, na: !edging },
+    { key: "edge-done", label: "Edging completed", done: edge?.status === "COMPLETED", at: edge?.completedAt ?? undefined, detail: edging ? stageDetail(edge, "Edging") : undefined, na: !edging },
     { key: "completed", label: "Ready for collection", done: job.status === "COMPLETED", at: first("JOB_COMPLETED") },
   ];
   let currentSet = false;

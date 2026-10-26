@@ -21,16 +21,15 @@ function failure(error: unknown): { ok: false; error: string } {
   throw error;
 }
 
-export async function createJobAction(input: JobInput): Promise<JobResult> {
+export async function createJobAction(input: JobInput): Promise<{ ok: true; workNumber: string } | { ok: false; error: string }> {
   const actor = await staff();
-  let workNumber: string;
   try {
-    ({ workNumber } = await createJob(actor, input));
+    const { workNumber } = await createJob(actor, input);
+    revalidatePath("/admin/jobs");
+    return { ok: true, workNumber };
   } catch (error) {
     return failure(error);
   }
-  revalidatePath("/admin/jobs");
-  redirect(`/admin/jobs/${workNumber}`);
 }
 
 export async function updateJobAction(workNumber: string, input: JobDetailsInput): Promise<JobResult> {

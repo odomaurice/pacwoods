@@ -11,6 +11,7 @@ import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
+import { notify } from "@/server/services/notifications";
 import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
@@ -77,6 +78,8 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
     );
     if (cuttingOperator || edgingOperator) {
       await recordJobEvent(created._id, { type: "OPERATOR_ASSIGNED", actorId: actor.id, note: "Operators assigned at registration", clientVisible: false }, session);
+      const assigned = [...new Set([cuttingOperator, edgingOperator].filter(Boolean).map(String))];
+      await notify(assigned, { title: `${created.workNumber} is assigned to you`, body: "It will appear in your queue once it is ready to cut.", href: "/operator/queue" }, session);
     }
     if (data.materialsAvailable) {
       await recordJobEvent(created._id, { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" }, session);

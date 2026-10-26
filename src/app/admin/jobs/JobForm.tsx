@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { uploadPhoto } from "@/lib/image-resize";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createJobAction, updateJobAction } from "@/actions/jobs";
@@ -33,7 +36,10 @@ export default function JobForm({
   /** Editing a draft: the client cannot change, so it rides along unseen. */
   existing?: { workNumber: string; values: JobInput };
 }) {
+  const router = useRouter();
   const [serverError, setServerError] = useState<string>();
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [progress, setProgress] = useState<string>();
   const [pending, startTransition] = useTransition();
   const editing = Boolean(existing);
   const {
@@ -54,15 +60,28 @@ export default function JobForm({
     setServerError(undefined);
     startTransition(async () => {
       const { clientId, ...details } = values;
-      const result = existing
-        ? await updateJobAction(existing.workNumber, details)
-        : await createJobAction({
-            ...details,
-            clientId,
-            cuttingOperatorId: details.cuttingOperatorId || undefined,
-            edgingOperatorId: details.edging ? details.edgingOperatorId || undefined : undefined,
-          });
-      if (result && !result.ok) setServerError(result.error);
+      if (existing) {
+        const result = await updateJobAction(existing.workNumber, details);
+        if (result && !result.ok) setServerError(result.error);
+        return;
+      }
+      const result = await createJobAction({
+        ...details,
+        clientId,
+        cuttingOperatorId: details.cuttingOperatorId || undefined,
+        edgingOperatorId: details.edging ? details.edgingOperatorId || undefined : undefined,
+      });
+      if (!result.ok) {
+        setServerError(result.error);
+        return;
+      }
+      for (const [i, file] of photos.entries()) {
+        setProgress(`Uploading photo ${i + 1} of ${photos.length}…`);
+        const error = await uploadPhoto(file, { workNumber: result.workNumber, kind: "MATERIAL" });
+        if (error) toast.error(error);
+      }
+      setProgress(undefined);
+      router.push(`/admin/jobs/${result.workNumber}`);
     });
   });
 
@@ -122,6 +141,22 @@ export default function JobForm({
       )}
 
       {!editing && (
+        <div className="space-y-2">
+          <Label htmlFor="wood-photos">Photos of the wood (optional)</Label>
+          <input
+            id="wood-photos"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-4 file:py-2.5 file:font-medium"
+            onChange={(e) => setPhotos([...(e.target.files ?? [])].slice(0, 12))}
+          />
+          {photos.length > 0 && <p className="text-sm text-muted-foreground">{photos.length} photo{photos.length === 1 ? "" : "s"} will be added to the job.</p>}
+        </div>
+      )}
+
+      {!editing && (
         <label className="flex min-h-11 items-start gap-3 rounded-lg bg-accent p-3 text-sm">
           <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("materialsAvailable")} />
           <span>
@@ -148,7 +183,7 @@ export default function JobForm({
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending} className="h-11">
-          {pending ? "Saving…" : editing ? "Save changes" : "Create job"}
+          {progress ?? (pending ? "Saving…" : editing ? "Save changes" : "Create job")}
         </Button>
         <Link
           href={existing ? `/admin/jobs/${existing.workNumber}` : "/admin/jobs"}

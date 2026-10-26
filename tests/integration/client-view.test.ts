@@ -6,7 +6,7 @@ import { approveCutlist, generatePlan } from "@/server/services/cutlists";
 import { createJob } from "@/server/services/jobs";
 import { completeTask, startTask } from "@/server/services/production";
 import { bootstrapSuperAdmin, provisionAccount, provisionClient, type Actor } from "@/server/services/users";
-import { connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
+import { addFinishedPhoto, connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
 
 describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
   let root: Actor;
@@ -59,7 +59,7 @@ describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
     const queued = await ProductionTask.find({ assignedOperatorId: op.id, status: "QUEUED" }).sort({ queueSeq: 1 }).lean();
     for (const t of queued) {
       await startTask(op, t._id.toString());
-      await completeTask(op, t._id.toString(), { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 });
+      await addFinishedPhoto(t._id.toString(), op.id); await completeTask(op, t._id.toString(), { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 });
     }
     const j = await job(false);
     const task = (await ProductionTask.findOne({ jobId: j._id, stage: "CUTTING" }).lean())!;
@@ -67,7 +67,7 @@ describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
     let s = state((await clientJobView(client.userId, j.workNumber))!.steps);
     expect(s["cut-start"]).toBe("done");
     expect(s["cut-done"]).toBe("current");
-    await completeTask(op, task._id.toString(), { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 });
+    await addFinishedPhoto(task._id.toString(), op.id); await completeTask(op, task._id.toString(), { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 });
     s = state((await clientJobView(client.userId, j.workNumber))!.steps);
     expect(s).toMatchObject({ "cut-done": "done", completed: "done" });
   });

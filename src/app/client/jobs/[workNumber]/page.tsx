@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReportIssueButton } from "@/components/issues/IssueButtons";
 import IssueList from "@/components/issues/IssueList";
+import JobPhotos from "@/components/photos/JobPhotos";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -31,7 +32,7 @@ export default async function ClientJobPage({ params }: PageProps<"/client/jobs/
 
   return (
     <>
-      <Link href="/client" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/client/jobs" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
         ← My jobs
       </Link>
       <PageHeader
@@ -129,6 +130,10 @@ export default async function ClientJobPage({ params }: PageProps<"/client/jobs/
             </ol>
           </section>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <JobPhotos jobId={job._id} viewer={user} />
       </div>
 
       {issues.length > 0 && (

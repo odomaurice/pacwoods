@@ -8,7 +8,7 @@ import { approveCutlist, generatePlan } from "@/server/services/cutlists";
 import { confirmMaterials, createJob, updateDraftJob } from "@/server/services/jobs";
 import { assignOperator, completeTask, pauseTask, startTask } from "@/server/services/production";
 import { bootstrapSuperAdmin, provisionAccount, provisionClient, setUserStatus, type Actor } from "@/server/services/users";
-import { connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
+import { addFinishedPhoto, connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
 
 describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
   let root: Actor;
@@ -72,10 +72,10 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     await expect(startTask(op, second.cutId)).rejects.toMatchObject({ code: "CONFLICT" });
     await startTask(op, first.cutId);
     await expect(startTask(op, second.cutId)).rejects.toMatchObject({ code: "CONFLICT" });
-    await completeTask(op, first.cutId, done);
+    await addFinishedPhoto(first.cutId, op.id); await completeTask(op, first.cutId, done);
     await startTask(op, second.cutId);
     expect(await taskStatus(second.cutId)).toBe("IN_PROGRESS");
-    await completeTask(op, second.cutId, done);
+    await addFinishedPhoto(second.cutId, op.id); await completeTask(op, second.cutId, done);
   });
 
   it("lets only one of two simultaneous starts succeed", async () => {
@@ -85,7 +85,7 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     const results = await Promise.allSettled([startTask(op, cutId), startTask(op, cutId), startTask(op, cutId)]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(await ProcessingSession.countDocuments({ taskId: cutId })).toBe(1);
-    await completeTask(op, cutId, done);
+    await addFinishedPhoto(cutId, op.id); await completeTask(op, cutId, done);
   });
 
   it("pauses without completing, resumes, and keeps every session", async () => {
@@ -98,7 +98,7 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     expect(await taskStatus(cutId)).toBe("PAUSED");
     expect(await status(job._id)).toBe("CUTTING_IN_PROGRESS");
     await startTask(op, cutId);
-    await completeTask(op, cutId, done);
+    await addFinishedPhoto(cutId, op.id); await completeTask(op, cutId, done);
     const sessions = await ProcessingSession.find({ taskId: cutId }).sort({ startedAt: 1 }).lean();
     expect(sessions.map((s) => s.endReason)).toEqual(["PAUSE", "COMPLETE"]);
     expect(await status(job._id)).toBe("COMPLETED");
@@ -111,13 +111,13 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     await expect(startTask(allRounder, edgeId!)).rejects.toMatchObject({ code: "CONFLICT" });
 
     await startTask(allRounder, cutId);
-    await completeTask(allRounder, cutId, done);
+    await addFinishedPhoto(cutId, allRounder.id); await completeTask(allRounder, cutId, done);
     expect(await status(job._id)).toBe("QUEUED_FOR_EDGING");
     expect(await taskStatus(edgeId!)).toBe("QUEUED");
 
     await startTask(allRounder, edgeId!);
     expect(await status(job._id)).toBe("EDGING_IN_PROGRESS");
-    await completeTask(allRounder, edgeId!, done);
+    await addFinishedPhoto(edgeId!, allRounder.id); await completeTask(allRounder, edgeId!, done);
     expect(await status(job._id)).toBe("COMPLETED");
 
     const types = (await JobStatusEvent.find({ jobId: job._id }).sort({ at: 1 }).lean()).map((e) => e.type);
@@ -148,7 +148,7 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     const s = await ProcessingSession.find({ taskId: cutId }).lean();
     expect(s.map((x) => x.endReason)).toEqual(["REASSIGN"]);
     await startTask(second, cutId);
-    await completeTask(second, cutId, done);
+    await addFinishedPhoto(cutId, second.id); await completeTask(second, cutId, done);
   });
 
   it("creates production stages with the job, with operators chosen on the form", async () => {
@@ -188,7 +188,7 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     expect(queued?.status).toBe("QUEUED");
     expect(queued?.assignedOperatorId?.toString()).toBe(op.id);
     await startTask(op, task!._id.toString());
-    await completeTask(op, task!._id.toString(), done);
+    await addFinishedPhoto(task!._id.toString(), op.id); await completeTask(op, task!._id.toString(), done);
   });
 
   it("cannot complete work that is not in progress", async () => {
