@@ -3,6 +3,7 @@ import { requireUser } from "@/server/auth/guards";
 import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Job } from "@/server/db/models/Job";
+import { ProductionTask } from "@/server/db/models/ProductionTask";
 
 /**
  * Where a scanned job QR code lands. The token is opaque; the job is only
@@ -14,7 +15,7 @@ export default async function ScanPage({ params }: PageProps<"/j/[token]">) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) notFound();
 
   await connectDb();
-  const job = await Job.findOne({ qrToken: token }).select("workNumber clientId").lean();
+  const job = await Job.findOne({ qrToken: token }).select("_id workNumber clientId").lean();
   if (!job) notFound();
 
   switch (user.role) {
@@ -26,8 +27,10 @@ export default async function ScanPage({ params }: PageProps<"/j/[token]">) {
       if (!owns) notFound();
       redirect(`/client/jobs/${job.workNumber}/card`);
     }
-    case "OPERATOR":
-      // Operators reach jobs through their queue (production phase).
-      redirect("/operator");
+    case "OPERATOR": {
+      // Straight to this job if it is assigned to them; otherwise their queue.
+      const task = await ProductionTask.findOne({ jobId: job._id, assignedOperatorId: user.id }).sort({ status: 1 }).select("_id").lean();
+      redirect(task ? `/operator/tasks/${task._id}` : "/operator");
+    }
   }
 }

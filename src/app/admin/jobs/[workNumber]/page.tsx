@@ -5,6 +5,7 @@ import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/
 import Detail from "@/components/Detail";
 import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
 import PageHeader from "@/components/PageHeader";
+import IssueList from "@/components/issues/IssueList";
 import JobProduction from "@/components/production/JobProduction";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { requireRole } from "@/server/auth/guards";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { User } from "@/server/db/models/User";
 import { loadJobCutlist, planIsCurrent } from "@/server/services/cutlists";
+import { listIssues } from "@/server/services/issues";
 import { getJobByWorkNumber } from "@/server/services/jobs";
 
 export async function generateMetadata({ params }: PageProps<"/admin/jobs/[workNumber]">): Promise<Metadata> {
@@ -40,7 +42,8 @@ const EVENT_LABELS: Record<string, string> = {
   EDGING_RESUMED: "Edging resumed",
   EDGING_COMPLETED: "Edging completed",
   JOB_COMPLETED: "Job completed",
-  ISSUE_REPORTED: "Issue reported by operator",
+  ISSUE_REPORTED: "Issue reported",
+  ISSUE_RESOLVED: "Issue resolved",
 };
 
 const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
@@ -55,6 +58,7 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
   const { current, draft, approved } = cutlists;
 
   const events = await JobStatusEvent.find({ jobId: job._id }).sort({ at: -1 }).lean();
+  const issues = await listIssues({ status: "ALL", jobId: job._id });
   const actorIds = [...events.map((e) => e.actorId), job.materialConfirmedBy].filter(Boolean);
   const actors = await User.find({ _id: { $in: actorIds } }).select("name").lean();
   const actorName = new Map(actors.map((a) => [a._id.toString(), a.name]));
@@ -132,6 +136,15 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
           ) : (
             <MaterialsAvailableButton workNumber={job.workNumber} approved={job.status === "AWAITING_MATERIAL"} />
           )}
+        </section>
+      )}
+
+      {issues.rows.length > 0 && (
+        <section aria-labelledby="issues" className="mb-8 space-y-3">
+          <h2 id="issues" className="text-lg font-semibold">
+            Issues <span className="font-normal text-muted-foreground">· {issues.rows.filter((r) => r.status === "OPEN").length} open</span>
+          </h2>
+          <IssueList rows={issues.rows} staff />
         </section>
       )}
 

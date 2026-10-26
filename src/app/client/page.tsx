@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import StatTile from "@/components/dashboard/StatTile";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
@@ -9,6 +10,7 @@ import { requireRole } from "@/server/auth/guards";
 import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Job } from "@/server/db/models/Job";
+import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 
 export const metadata: Metadata = { title: "My jobs | Pacwoods" };
 
@@ -27,6 +29,14 @@ export default async function ClientJobs() {
         .lean()
     : [];
 
+  const done = jobs.filter((j) => j.status === "COMPLETED").length;
+  const inProduction = jobs.filter((j) => ["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS", "QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS"].includes(j.status)).length;
+  const updates = jobs.length
+    ? await JobStatusEvent.find({ jobId: { $in: jobs.map((j) => j._id) }, clientVisible: true }).sort({ at: -1 }).limit(6).lean()
+    : [];
+  const workNumberOf = new Map(jobs.map((j) => [j._id.toString(), j.workNumber]));
+  const when = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
   return (
     <>
       <PageHeader
@@ -41,6 +51,31 @@ export default async function ClientJobs() {
           )
         }
       />
+      {jobs.length > 0 && (
+        <div className="mb-6 grid grid-cols-3 gap-3">
+          <StatTile label="All jobs" value={jobs.length} href="/client" />
+          <StatTile label="Being worked on" value={inProduction} href="/client" />
+          <StatTile label="Completed" value={done} href="/client" />
+        </div>
+      )}
+
+      {updates.length > 0 && (
+        <section aria-labelledby="updates" className="mb-6 rounded-lg bg-card p-5">
+          <h2 id="updates" className="mb-3 font-semibold">
+            Latest updates
+          </h2>
+          <ol className="space-y-2 text-sm">
+            {updates.map((u) => (
+              <li key={u._id.toString()} className="flex flex-wrap gap-x-2">
+                <span className="font-mono font-medium">{workNumberOf.get(u.jobId.toString())}</span>
+                <span>{u.note ?? u.type.replaceAll("_", " ").toLowerCase()}</span>
+                <span className="text-muted-foreground">· {when.format(u.at)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {jobs.length === 0 ? (
         <EmptyState title="You have no jobs with Pacwoods yet." />
       ) : (

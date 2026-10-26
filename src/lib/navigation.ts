@@ -1,5 +1,6 @@
 import {
   Briefcase01Icon,
+  Alert02Icon,
   DashboardSquare01Icon,
   WorkHistoryIcon,
   ListViewIcon,
@@ -14,14 +15,14 @@ import {
 import { hasPermission, type Permission, type Role } from "@/lib/roles";
 
 export type NavIcon = typeof DashboardSquare01Icon;
-export type NavItem = { href: string; label: string; icon: NavIcon };
+export type NavItem = { href: string; label: string; icon: NavIcon; badge?: number };
 export type NavSection = { title?: string; items: NavItem[] };
 
 /**
  * Sidebar entries per role. Only pages that exist are listed; later phases add
  * queues, cutlists, reports and the rest.
  */
-export function navigationFor(user: { role: Role; permissions: readonly Permission[] }): NavSection[] {
+export function navigationFor(user: { role: Role; permissions: readonly Permission[] }, counts: { openIssues?: number } = {}): NavSection[] {
   switch (user.role) {
     case "SUPER_ADMIN":
     case "ADMIN": {
@@ -39,6 +40,7 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
           items: [
             { href: "/admin/jobs", label: "Jobs", icon: Briefcase01Icon },
             { href: "/admin/queues", label: "Queues", icon: ListViewIcon },
+            { href: "/admin/issues", label: "Issues", icon: Alert02Icon, badge: counts.openIssues || undefined },
             { href: "/admin/materials", label: "Materials", icon: Layers01Icon },
           ],
         },

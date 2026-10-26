@@ -59,6 +59,12 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
                 >
                   <HugeiconsIcon icon={item.icon} className={cn("size-5", active && "text-brand-gold")} />
                   {item.label}
+                  {item.badge ? (
+                    <span className="ml-auto rounded-full bg-brand-gold px-2 py-0.5 text-xs font-semibold text-brand-charcoal tabular-nums">
+                      {item.badge}
+                      <span className="sr-only"> open</span>
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}

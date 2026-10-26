@@ -1,87 +1,102 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { DailyBarChart } from "@/components/dashboard/Charts";
+import StatTile from "@/components/dashboard/StatTile";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
+import JobSummaryCard from "@/components/production/JobSummaryCard";
 import TaskActions from "@/components/production/TaskActions";
 import { TaskStatusBadge } from "@/components/StatusBadge";
+import { buttonVariants } from "@/components/ui/button";
 import ViewButton from "@/components/ViewButton";
 import { STAGES, STAGE_LABELS } from "@/lib/production";
-import { cn } from "@/lib/utils";
 import { requireRole } from "@/server/auth/guards";
+import { operatorDashboard } from "@/server/services/dashboard";
+import { getJobCardData, scanUrl } from "@/server/services/jobCards";
 import { operatorQueue } from "@/server/services/production";
 
 export const metadata: Metadata = { title: "My queue | Pacwoods" };
 
 export default async function OperatorQueue() {
   const user = await requireRole("OPERATOR");
-  const rows = await operatorQueue(user.id);
-  const active = rows.find((r) => r.task.status === "IN_PROGRESS");
+  const [rows, stats] = await Promise.all([operatorQueue(user.id), operatorDashboard(user.id)]);
+  const cards = await Promise.all(
+    rows.map(async (r) => {
+      const found = await getJobCardData(r.task.workNumber);
+      return { ...r, card: found ? { data: found.data, url: await scanUrl(found.qrToken) } : null };
+    }),
+  );
 
   return (
     <div className="space-y-8">
-      <PageHeader title="My queue" description="Your assigned work, in order. Only the next job in each queue can be started." />
+      <PageHeader title="My queue" description="Your assigned jobs, in order. Only the next job in each queue can be started." />
 
-      {active && (
-        <section aria-labelledby="active" className="space-y-3 rounded-lg bg-brand-charcoal p-5 text-white">
-          <p id="active" className="text-xs font-semibold tracking-[0.2em] text-brand-gold uppercase">
-            In progress · {STAGE_LABELS[active.task.stage]}
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-mono text-2xl font-semibold">{active.task.workNumber}</p>
-              {active.job?.title && <p className="text-white/90">{active.job.title}</p>}
-            </div>
-            <ViewButton href={`/operator/tasks/${active.task._id}`} label={`View ${active.task.workNumber}`} />
-          </div>
-        </section>
-      )}
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile label="In my queue" value={stats.waiting} href="/operator" />
+        <StatTile label="Completed this week" value={stats.completedThisWeek} href="/operator/history" hint="History" />
+        <StatTile label="Hours worked this week" value={stats.hoursThisWeek} href="/operator/history" hint="History" />
+      </div>
 
-      {rows.length === 0 ? (
+      {cards.length === 0 ? (
         <EmptyState title="No work is assigned to you." />
       ) : (
-        STAGES.filter((stage) => user.capabilities.includes(stage) || rows.some((r) => r.task.stage === stage)).map((stage) => {
-          const list = rows.filter((r) => r.task.stage === stage);
+        STAGES.filter((stage) => user.capabilities.includes(stage) || cards.some((r) => r.task.stage === stage)).map((stage) => {
+          const list = cards.filter((r) => r.task.stage === stage).sort((a, b) => Number(b.task.status === "IN_PROGRESS") - Number(a.task.status === "IN_PROGRESS"));
           return (
             <section key={stage} aria-labelledby={`q-${stage}`} className="space-y-3">
               <h2 id={`q-${stage}`} className="text-lg font-semibold">
-                {STAGE_LABELS[stage]} queue
+                {STAGE_LABELS[stage]} queue <span className="font-normal text-muted-foreground">· {list.length}</span>
               </h2>
               {list.length === 0 ? (
                 <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} assigned to you.`} />
               ) : (
-                <ol className="space-y-3">
-                  {list.map(({ task, job, rule }, i) => (
-                    <li key={task._id.toString()} className={cn("rounded-lg bg-card p-4", !rule.canStart && task.status !== "IN_PROGRESS" && "opacity-80")}>
-                      <div className="mb-3 flex flex-wrap items-center gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full bg-muted text-sm font-semibold tabular-nums" aria-label={`Position ${i + 1}`}>
-                          {i + 1}
+                <ol className="grid gap-4 xl:grid-cols-2">
+                  {list.map(({ task, rule, card }, i) => {
+                    const id = task._id.toString();
+                    const header = (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold" aria-label={`Position ${i + 1}`}>
+                          #{i + 1}
                         </span>
-                        <span className="font-mono font-semibold">{task.workNumber}</span>
                         <TaskStatusBadge status={task.status} />
-                        {job?.title && <span className="text-sm text-muted-foreground">{job.title}</span>}
-                        <span className="ml-auto">
-                          <ViewButton href={`/operator/tasks/${task._id}`} label={`View ${task.workNumber}`} />
-                        </span>
+                        {task.status === "IN_PROGRESS" && <span className="text-xs font-semibold tracking-wide text-brand-gold uppercase">Working now</span>}
                       </div>
-                      {task.status !== "IN_PROGRESS" && (
-                        <TaskActions
-                          taskId={task._id.toString()}
-                          workNumber={task.workNumber}
-                          stage={task.stage}
-                          status={task.status}
-                          canStart={rule.canStart}
-                          reason={rule.reason}
-                          totalPanels={0}
-                          startOnly
-                        />
-                      )}
-                    </li>
-                  ))}
+                    );
+                    const actions = (
+                      <div className="space-y-3">
+                        {task.status !== "IN_PROGRESS" && (
+                          <TaskActions taskId={id} workNumber={task.workNumber} stage={task.stage} status={task.status} canStart={rule.canStart} reason={rule.reason} totalPanels={0} startOnly />
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <ViewButton href={`/operator/tasks/${id}`} label={`View ${task.workNumber}`} />
+                          <Link href={`/operator/tasks/${id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                            Print job card
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <li key={id}>
+                        {card ? (
+                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header}>
+                            {actions}
+                          </JobSummaryCard>
+                        ) : (
+                          <div className="rounded-lg bg-card p-4">
+                            {task.workNumber} {actions}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </section>
           );
         })
       )}
+
+      <DailyBarChart data={stats.completedPerDay} title="Work I completed" unit="Stages completed" />
     </div>
   );
 }

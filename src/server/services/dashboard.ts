@@ -1,0 +1,120 @@
+import "server-only";
+import mongoose from "mongoose";
+import type { JobStatus } from "@/lib/jobs";
+import { connectDb } from "@/server/db/connect";
+import { CutlistVersion } from "@/server/db/models/CutlistVersion";
+import { Issue } from "@/server/db/models/Issue";
+import { Job } from "@/server/db/models/Job";
+import { ProcessingSession } from "@/server/db/models/ProcessingSession";
+import { ProductionTask } from "@/server/db/models/ProductionTask";
+import { User } from "@/server/db/models/User";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Every figure on the staff overview, counted from the database now. */
+export async function staffDashboard(now = new Date()) {
+  await connectDb();
+  const since14 = new Date(now.getTime() - 13 * DAY);
+  since14.setUTCHours(0, 0, 0, 0);
+  const since30 = new Date(now.getTime() - 30 * DAY);
+
+  const [statusRows, perDayRows, openIssues, completed30, unassigned, load, approved] = await Promise.all([
+    Job.aggregate<{ _id: JobStatus; count: number }>([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Job.aggregate<{ _id: string; count: number }>([
+      { $match: { createdAt: { $gte: since14 } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
+    ]),
+    Issue.countDocuments({ status: "OPEN" }),
+    // A completed job is not modified again, so updatedAt is its completion time.
+    Job.countDocuments({ status: "COMPLETED", updatedAt: { $gte: since30 } }),
+    ProductionTask.countDocuments({ status: { $in: ["BLOCKED", "QUEUED", "PAUSED"] }, assignedOperatorId: null }),
+    ProductionTask.aggregate<{ _id: { op: string; stage: "CUTTING" | "EDGING" }; count: number }>([
+      { $match: { status: { $in: ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] }, assignedOperatorId: { $ne: null } } },
+      { $group: { _id: { op: "$assignedOperatorId", stage: "$stage" }, count: { $sum: 1 } } },
+    ]),
+    CutlistVersion.find({ state: "APPROVED", approvedAt: { $gte: new Date(now.getTime() - 90 * DAY) } })
+      .select("stockSheets plan.sheets.stockRef")
+      .lean(),
+  ]);
+
+  const byStatus = Object.fromEntries(statusRows.map((r) => [r._id, r.count])) as Partial<Record<JobStatus, number>>;
+  const n = (s: JobStatus) => byStatus[s] ?? 0;
+
+  // Fill every day, including days with no jobs.
+  const perDayMap = new Map(perDayRows.map((r) => [r._id, r.count]));
+  const jobsPerDay = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(since14.getTime() + i * DAY);
+    const key = d.toISOString().slice(0, 10);
+    return { day: key, label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }), jobs: perDayMap.get(key) ?? 0 };
+  });
+
+  const operators = await User.find({ _id: { $in: [...new Set(load.map((l) => l._id.op))] } }).select("name").lean();
+  const opName = new Map(operators.map((o) => [o._id.toString(), o.name]));
+  const loadMap = new Map<string, { id: string; name: string; cutting: number; edging: number }>();
+  for (const l of load) {
+    const id = l._id.op.toString();
+    const row = loadMap.get(id) ?? { id, name: opName.get(id) ?? "Unknown", cutting: 0, edging: 0 };
+    if (l._id.stage === "CUTTING") row.cutting += l.count;
+    else row.edging += l.count;
+    loadMap.set(id, row);
+  }
+  const workload = [...loadMap.values()].sort((a, b) => b.cutting + b.edging - (a.cutting + a.edging));
+
+  const sheetsByMaterial = new Map<string, number>();
+  for (const v of approved) {
+    const label = new Map(v.stockSheets.map((s) => [s.ref, s.materialName ? `${s.materialName} ${s.thicknessMm} mm` : `${s.length}×${s.width} (no material)`]));
+    for (const sheet of v.plan?.sheets ?? []) {
+      const key = label.get(sheet.stockRef) ?? "Unknown";
+      sheetsByMaterial.set(key, (sheetsByMaterial.get(key) ?? 0) + 1);
+    }
+  }
+
+  return {
+    kpis: {
+      active: statusRows.filter((r) => r._id !== "COMPLETED" && r._id !== "CANCELLED").reduce((a, r) => a + r.count, 0),
+      inProduction: n("CUTTING_IN_PROGRESS") + n("EDGING_IN_PROGRESS"),
+      waitingInQueues: n("QUEUED_FOR_CUTTING") + n("QUEUED_FOR_EDGING"),
+      unassigned,
+      openIssues,
+      completed30: completed30,
+    },
+    byStatus,
+    jobsPerDay,
+    workload,
+    sheetsByMaterial: [...sheetsByMaterial].map(([material, sheets]) => ({ material, sheets })).sort((a, b) => b.sheets - a.sheets),
+  };
+}
+
+/** An operator's own figures: what is waiting, and what they did recently. */
+export async function operatorDashboard(operatorId: string, now = new Date()) {
+  await connectDb();
+  const me = new mongoose.Types.ObjectId(operatorId);
+  const since14 = new Date(now.getTime() - 13 * DAY);
+  since14.setUTCHours(0, 0, 0, 0);
+  const weekAgo = new Date(now.getTime() - 7 * DAY);
+
+  const [waiting, done, sessions] = await Promise.all([
+    ProductionTask.countDocuments({ assignedOperatorId: me, status: { $in: ["BLOCKED", "QUEUED", "PAUSED", "IN_PROGRESS"] } }),
+    ProductionTask.find({ completedBy: me, completedAt: { $gte: since14 } }).select("completedAt").lean(),
+    ProcessingSession.find({ operatorId: me, startedAt: { $gte: weekAgo } }).select("startedAt endedAt").lean(),
+  ]);
+
+  const perDay = new Map<string, number>();
+  for (const t of done) {
+    const key = t.completedAt!.toISOString().slice(0, 10);
+    perDay.set(key, (perDay.get(key) ?? 0) + 1);
+  }
+  const completedPerDay = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(since14.getTime() + i * DAY);
+    const key = d.toISOString().slice(0, 10);
+    return { day: key, label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }), jobs: perDay.get(key) ?? 0 };
+  });
+  const workedMs = sessions.reduce((ms, s) => ms + ((s.endedAt ?? now).getTime() - s.startedAt.getTime()), 0);
+
+  return {
+    waiting,
+    completedThisWeek: done.filter((t) => t.completedAt! >= weekAgo).length,
+    hoursThisWeek: Math.round((workedMs / 3_600_000) * 10) / 10,
+    completedPerDay,
+  };
+}

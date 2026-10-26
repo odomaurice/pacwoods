@@ -215,16 +215,6 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
   });
 }
 
-export async function reportIssue(operator: Operator, taskId: string, note: string) {
-  if (operator.role !== "OPERATOR") throw new ServiceError("FORBIDDEN", "Only operators report production issues.");
-  const text = note.trim();
-  if (text.length < 3) throw new ServiceError("INVALID", "Describe the issue.");
-  await connectDb();
-  const task = await loadTask(taskId);
-  if (!task.assignedOperatorId?.equals(oid(operator.id))) throw new ServiceError("FORBIDDEN", "This work is not assigned to you.");
-  await recordJobEvent(task.jobId, { type: "ISSUE_REPORTED", actorId: operator.id, note: text.slice(0, 1000), clientVisible: false });
-}
-
 // ── Reading ─────────────────────────────────────────────────────────────────
 
 /** Active time from sessions; an open session counts up to now. */

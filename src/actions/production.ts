@@ -6,7 +6,6 @@ import {
   assignOperator,
   completeTask,
   pauseTask,
-  reportIssue,
   startTask,
   type CompletionInput,
 } from "@/server/services/production";
@@ -49,9 +48,4 @@ export async function pauseTaskAction(taskId: string, reason: string): Promise<P
 export async function completeTaskAction(taskId: string, input: CompletionInput): Promise<ProductionResult> {
   const me = await operator();
   return run(() => completeTask(me, taskId, input));
-}
-
-export async function reportIssueAction(taskId: string, note: string): Promise<ProductionResult> {
-  const me = await operator();
-  return run(() => reportIssue(me, taskId, note));
 }

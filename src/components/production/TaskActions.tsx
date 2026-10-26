@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { completeTaskAction, pauseTaskAction, reportIssueAction, startTaskAction } from "@/actions/production";
+import { completeTaskAction, pauseTaskAction, startTaskAction } from "@/actions/production";
 import ConfirmAction from "@/components/ConfirmAction";
+import { ReportIssueButton } from "@/components/issues/IssueButtons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +62,7 @@ export default function TaskActions({ taskId, workNumber, stage, status, canStar
             <PauseButton taskId={taskId} workNumber={workNumber} word={word} run={run} />
           </>
         )}
-        {status !== "COMPLETED" && !startOnly && <IssueButton taskId={taskId} workNumber={workNumber} run={run} />}
+        {status !== "COMPLETED" && !startOnly && <ReportIssueButton large target={{ kind: "task", taskId }} workNumber={workNumber} />}
       </div>
       {!canStart && reason && status !== "IN_PROGRESS" && <p className="text-sm text-muted-foreground">{reason}</p>}
     </div>
@@ -140,30 +141,6 @@ function CompleteButton({ taskId, workNumber, word, totalPanels, run }: { taskId
           return false;
         }
         return run(() => completeTaskAction(taskId, parsed.data), `${word[0].toUpperCase()}${word.slice(1)} completed.`);
-      }}
-    />
-  );
-}
-
-function IssueButton({ taskId, workNumber, run }: { taskId: string; workNumber: string; run: Run }) {
-  const [note, setNote] = useState("");
-  return (
-    <ConfirmAction
-      large
-      label="Report an issue"
-      title={`Report an issue on ${workNumber}`}
-      description={
-        <span className="block space-y-1.5 text-left">
-          <Label htmlFor="issue-note">What is wrong?</Label>
-          <Textarea id="issue-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
-          <span className="block text-xs">Staff see this on the job. To change the cutlist, an administrator must reopen it.</span>
-        </span>
-      }
-      confirmLabel="Send"
-      onConfirm={async () => {
-        const ok = await run(() => reportIssueAction(taskId, note), "Issue reported.");
-        if (ok) setNote("");
-        return ok;
       }}
     />
   );
