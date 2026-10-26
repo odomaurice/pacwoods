@@ -435,9 +435,25 @@ catalogue (Super Admin edits, retire not delete) ✔ audit log page ✔ role
 sidebars. Operator capabilities live on the user document rather than a
 separate operatorProfiles collection; one fewer join, same rules.
 
-**Phase 3 (cutlist):** ☐ cutlist editor (parts, stock, options, edges) ☐ engine
-+ validators + property tests ☐ SVG plan viewer ☐ calculations + estimates ☐
-versioning, approval, revision lock.
+**Phase 3 (cutlist):** ✔ cutlist editor modelled on the reference app (panels,
+stock sheets, options, per-edge banding picker, always ≥ 4 rows) ✔ guillotine
+engine + independent validator + 300-case randomised test ✔ SVG plan drawn from
+the stored plan, zoom, cut sequence ✔ totals, lower bound, labelled estimates ✔
+versioned cutlists: draft → approved (locked) → reopen with reason → superseded
+✔ job timeline (append-only) and status transitions ✔ printable job card (staff
+and client versions) with QR → `/j/<token>` ✔ standard materials catalogue.
+
+**Defaults taken for the open cutlist questions (2026-10-26, "do what is
+conventional")**, each changeable per job in the Options section:
+- Sizes are entered as cut sizes; banded edges are marked, not deducted, unless
+  "Subtract edge-band thickness" is on (default band 1 mm).
+- Kerf 4 mm, edge trim 0 mm, millimetres throughout.
+- Sheet grain runs along the sheet length; with "Consider grain" on, a panel
+  with grain is never turned against it.
+- Time estimates: 3 min handling per sheet, 40 s per cut, edgebander 8 m/min
+  plus 20 s per banded edge (`ESTIMATE_ASSUMPTIONS` in `src/lib/cutlist.ts`).
+- Plans are embedded in their cutlist version instead of a separate
+  cuttingPlans collection: a plan is never shared between versions.
 
 **Phase 4 (production):** ☐ tasks + queueSeq ☐ eligibility + head-of-queue
 check ☐ start/pause/resume/complete/interrupt with confirmations ☐ concurrency

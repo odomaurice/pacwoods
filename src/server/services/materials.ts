@@ -1,6 +1,7 @@
 import "server-only";
 import mongoose, { mongo } from "mongoose";
 import { materialSchema, type MaterialInput } from "@/lib/schemas";
+import { STANDARD_MATERIALS } from "@/lib/standard-materials";
 import { connectDb } from "@/server/db/connect";
 import { Material } from "@/server/db/models/Material";
 import { audit } from "@/server/services/audit";
@@ -50,4 +51,18 @@ export async function setMaterialActive(actor: Actor, materialId: string, active
     targetId: material._id,
   });
   return material;
+}
+
+/**
+ * Adds any standard materials not already in the catalogue (matched on name
+ * and thickness). Existing and retired entries are left alone.
+ */
+export async function addStandardMaterials(actorId?: string) {
+  await connectDb();
+  const existing = await Material.find().select("name thicknessMm").lean();
+  const have = new Set(existing.map((m) => `${m.name}|${m.thicknessMm}`));
+  const missing = STANDARD_MATERIALS.filter((m) => !have.has(`${m.name}|${m.thicknessMm}`));
+  if (missing.length) await Material.insertMany(missing, { ordered: false });
+  await audit({ actorId, action: "material.standard_added", meta: { added: missing.length } });
+  return missing.length;
 }

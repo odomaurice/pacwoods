@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/server/auth/guards";
 import type { MaterialInput } from "@/lib/schemas";
-import { createMaterial, setMaterialActive } from "@/server/services/materials";
+import { addStandardMaterials, createMaterial, setMaterialActive } from "@/server/services/materials";
 import { ServiceError } from "@/server/services/users";
 
 export type MaterialResult = { ok: true } | { ok: false; error: string };
@@ -40,4 +40,11 @@ export async function setMaterialActiveAction(materialId: string, active: boolea
   } catch (error) {
     return failure(error);
   }
+}
+
+export async function addStandardMaterialsAction(): Promise<{ ok: true; added: number }> {
+  const actor = await superAdmin();
+  const added = await addStandardMaterials(actor.id);
+  revalidatePath("/admin/materials");
+  return { ok: true, added };
 }

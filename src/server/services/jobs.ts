@@ -10,6 +10,7 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
+import { recordJobEvent } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
 function assertStaff(actor: Actor) {
@@ -49,6 +50,7 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
       ],
       { session },
     );
+    await recordJobEvent(created._id, { type: "JOB_CREATED", actorId: actor.id, note: "Order registered" }, session);
     return created;
   });
 

@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/CutlistActions";
 import Detail from "@/components/Detail";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
-import { describeOperations } from "@/lib/jobs";
+import { describeOperations, JOB_STATUS_LABELS } from "@/lib/jobs";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
+import { percent } from "@/lib/plan-text";
 import { requireRole } from "@/server/auth/guards";
+import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
+import { User } from "@/server/db/models/User";
+import { loadJobCutlist, planIsCurrent } from "@/server/services/cutlists";
 import { getJobByWorkNumber } from "@/server/services/jobs";
 
 export async function generateMetadata({ params }: PageProps<"/admin/jobs/[workNumber]">): Promise<Metadata> {
@@ -16,13 +21,30 @@ export async function generateMetadata({ params }: PageProps<"/admin/jobs/[workN
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
+const EVENT_LABELS: Record<string, string> = {
+  JOB_CREATED: "Job registered",
+  PLAN_GENERATED: "Cutting plan generated",
+  CUTLIST_APPROVED: "Cutlist approved",
+  CUTLIST_REOPENED: "Cutlist reopened for changes",
+};
+
 export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNumber]">) {
   await requireRole("SUPER_ADMIN", "ADMIN");
   const { workNumber } = await params;
   if (!WORK_NUMBER_PATTERN.test(workNumber)) notFound();
-  const found = await getJobByWorkNumber(workNumber);
-  if (!found) notFound();
+  const [found, cutlists] = await Promise.all([getJobByWorkNumber(workNumber), loadJobCutlist(workNumber)]);
+  if (!found || !cutlists) notFound();
   const { job, profile, clientUser } = found;
+  const { current, draft, approved } = cutlists;
+
+  const events = await JobStatusEvent.find({ jobId: job._id }).sort({ at: -1 }).lean();
+  const actors = await User.find({ _id: { $in: events.map((e) => e.actorId).filter(Boolean) } }).select("name").lean();
+  const actorName = new Map(actors.map((a) => [a._id.toString(), a.name]));
+
+  const plan = current?.plan;
+  const current_ = current ? planIsCurrent(current) : false;
+  const canApprove = job.status === "DRAFT" && draft && current_ && plan && plan.unplaced.length === 0;
+  const panels = current?.parts.reduce((n, p) => n + p.quantity, 0) ?? 0;
 
   return (
     <>
@@ -33,11 +55,16 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
         title={job.workNumber}
         description={job.title}
         actions={
-          job.status === "DRAFT" && (
-            <Link href={`/admin/jobs/${job.workNumber}/edit`} className={buttonVariants({ variant: "outline" })}>
-              Edit details
+          <>
+            <Link href={`/admin/jobs/${job.workNumber}/card`} className={buttonVariants({ variant: "outline" })}>
+              Job card
             </Link>
-          )
+            {job.status === "DRAFT" && (
+              <Link href={`/admin/jobs/${job.workNumber}/edit`} className={buttonVariants({ variant: "outline" })}>
+                Edit details
+              </Link>
+            )}
+          </>
         }
       />
 
@@ -60,6 +87,42 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
         <Detail label="Last updated">{dateFormat.format(job.updatedAt)}</Detail>
       </dl>
 
+      <section className="mb-8 rounded-lg bg-card p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Cutlist and cutting plan</h2>
+            <p className="text-sm text-muted-foreground">
+              {!current
+                ? "No cutlist yet."
+                : `Version ${current.version} · ${current.state === "APPROVED" ? "approved" : "draft"} · ${current.parts.length} rows, ${panels} panels`}
+              {approved && draft && ` · version ${approved.version} remains approved until this draft is approved`}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/admin/jobs/${job.workNumber}/cutlist`} className={buttonVariants({ variant: job.status === "DRAFT" ? "default" : "outline" })}>
+              {job.status === "DRAFT" ? (current ? "Edit cutlist" : "Start cutlist") : "View cutlist"}
+            </Link>
+            {plan && (
+              <Link href={`/admin/jobs/${job.workNumber}/plan`} className={buttonVariants({ variant: "outline" })}>
+                View cutting plan
+              </Link>
+            )}
+            {canApprove && <ApproveCutlistButton workNumber={job.workNumber} />}
+            {job.status === "AWAITING_MATERIAL" && <ReopenCutlistButton workNumber={job.workNumber} />}
+          </div>
+        </div>
+        {plan && (
+          <dl className="grid gap-4 sm:grid-cols-4">
+            <Detail label="Sheets">{plan.totals.sheetsUsed}</Detail>
+            <Detail label="Utilisation">{percent(plan.totals.utilization)}</Detail>
+            <Detail label="Panels placed">
+              {plan.totals.partsPlaced} of {plan.totals.partsRequested}
+            </Detail>
+            <Detail label="Plan">{current_ ? "Up to date" : "Out of date — regenerate"}</Detail>
+          </dl>
+        )}
+      </section>
+
       <div className="mb-8 grid gap-4 md:grid-cols-2">
         <section className="rounded-lg bg-card p-5">
           <h2 className="mb-2 font-semibold">Notes for the client</h2>
@@ -71,11 +134,31 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
         </section>
       </div>
 
-      <section className="rounded-lg bg-muted p-5">
-        <h2 className="font-semibold">Cutlist</h2>
-        <p className="text-sm text-muted-foreground">
-          No parts or stock sheets yet. The cutlist editor and cutting plan are the next stage of the build.
-        </p>
+      <section className="rounded-lg bg-card p-5">
+        <h2 className="mb-3 font-semibold">Timeline</h2>
+        <ol className="space-y-3">
+          {events.map((e) => (
+            <li key={e._id.toString()} className="flex gap-3 text-sm">
+              <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-gold" aria-hidden />
+              <span>
+                <span className="font-medium">{EVENT_LABELS[e.type] ?? e.type}</span>
+                {e.from && e.to && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {JOB_STATUS_LABELS[e.from]} → {JOB_STATUS_LABELS[e.to]}
+                  </span>
+                )}
+                <span className="block text-muted-foreground">
+                  {dateFormat.format(e.at)}
+                  {e.actorId && ` · ${actorName.get(e.actorId.toString()) ?? "Unknown"}`}
+                  {e.note && ` · ${e.note}`}
+                  {e.reason && ` · Reason: ${e.reason}`}
+                  {!e.clientVisible && " · staff only"}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ol>
       </section>
     </>
   );

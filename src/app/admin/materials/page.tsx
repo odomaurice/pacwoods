@@ -7,6 +7,7 @@ import { requireRole } from "@/server/auth/guards";
 import { listMaterials } from "@/server/services/materials";
 import MaterialForm from "./MaterialForm";
 import MaterialToggle from "./MaterialToggle";
+import StandardMaterialsButton from "./StandardMaterialsButton";
 
 export const metadata: Metadata = { title: "Materials | Pacwoods" };
 
@@ -24,6 +25,7 @@ export default async function MaterialsPage() {
             ? "The sheet materials cutlists can use. Retire a material instead of deleting it."
             : "The sheet materials cutlists can use. Only a Super Admin can change this list."
         }
+        actions={canEdit && <StandardMaterialsButton />}
       />
       {canEdit && <MaterialForm />}
       {materials.length === 0 ? (

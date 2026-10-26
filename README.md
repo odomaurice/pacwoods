@@ -3,8 +3,8 @@
 Wood-cutting, edging, job-tracking and workshop management platform for
 Pacwoods, an industrial wood processing centre.
 
-**Status: Phase 1 (foundation).** Sign-in, forced password change, role
-areas and the account model work; jobs, cutlists and queues come next. The plan, domain model, decisions and open questions are
+**Status: Phase 3 (cutlists) done.** Accounts, clients, jobs, materials, the
+cutlist editor, cutting plans and job cards work; production queues come next. The plan, domain model, decisions and open questions are
 in [`docs/phase-0-architecture.md`](docs/phase-0-architecture.md).
 
 ## Stack
@@ -21,6 +21,7 @@ cp .env.example .env.local          # fill in MONGODB_URI and AUTH_SECRET
 npm run db:ping                      # checks the Atlas connection
 npm run db:indexes                   # creates the unique/TTL indexes
 npm run create-super-admin -- --name "Full Name" --email you@example.com
+npm run materials:standard           # optional: common sheet materials
 npm run dev                          # http://localhost:3000
 ```
 
