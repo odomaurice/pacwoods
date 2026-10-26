@@ -13,7 +13,7 @@ to them.
 | Dependencies | `framer-motion` removed (unused). The `shadcn` CLI was a runtime dependency only for one CSS import; that CSS is now vendored as `src/app/shadcn.css` and the CLI is run with `npx` when adding components. |
 | Git history | **Resolved:** restarted as a single clean commit pushed to `github.com/odomaurice/pacwoods`; the old history is kept only on a local `potto-archive` branch. Previously: Earlier Potto commits contain ~108 MB of loose objects: `public/videos/intro-main.mp4` (31.9 MB), slide JPEGs of 6–12 MB, more videos and avatar photos. Remotes `origin` and `personal` still point at Potto repositories. See §7, item 1. |
 | Brand | `docs/brand/logo-sample.jpeg` (photo of the sign). Palette sampled from it: charcoal `#1B2328`, gold `#D99E56`, steel `#E7E8EA`. The SVG mark is a redrawing, not the master artwork. |
-| Cutlist reference screenshot | **Not in the repository.** §7 of the spec asks to reproduce its workflow; it needs to be supplied before Phase 3. |
+| Cutlist reference screenshot | Supplied in chat (not stored in the repo). A mobile cutlist app: three collapsible sections, **Panels** and **Stock sheets** (spreadsheet grids: Length, Width, Qty, a label column and a row menu; a blank row is always waiting at the bottom; complete rows tint green, empty ones red) and **Options** (kerf thickness; labels on panels; use only one sheet from stock; consider material; edge banding; consider grain direction), plus a floating run button that generates the layout. Phase 3 keeps that flow and adds material, thickness, grain and per-edge banding per part, with validation messages instead of colour alone. |
 | Spec vs. sign | The sign lists **CNC machining**; the spec covers only cutting and edging. See §7. |
 
 ### Version check (npm registry, 2026-10-26)
@@ -413,19 +413,19 @@ server-only or lazy-loaded so they stay out of the main client bundle.
 17. **Retention:** how long are completed jobs, audit logs and client data kept?
 18. **Work numbers:** does the sequence restart each year (`PAC-2027-000001`)?
     Proposed: yes.
-19. **Cutlist reference screenshot:** please add it (e.g. `docs/brand/`).
+19. ~~Cutlist reference screenshot~~ — supplied; notes in §0.
 
 ## 8. Implementation checklist
 
 **Phase 0 (this document)**: repository inspected · rebrand · heavy deps
 removed · ADRs drafted · ADR-1 (Mongoose) and ADR-2 (Auth.js v5) accepted · ☐ §7 items 2–9.
 
-**Phase 1 (foundation):** ☐ data layer + connection + index sync ☐
-`.env.example` ☐ auth (credentials, Argon2id, sessionVersion, throttle, lockout)
-☐ forced password change ☐ guards (`requireRole`, `requireCapability`,
-`requireOwnClient`) ☐ `proxy.ts` redirects ☐ shadcn/ui init + Hugeicons ☐ role
-shells and navigation ☐ Vitest + Playwright + test database ☐ CI (lint, build,
-tests).
+**Phase 1 (foundation):** ✔ Mongoose connection + index sync ✔ `.env.example`
+✔ auth (credentials, Argon2id, sessionVersion re-check, IP + account throttle)
+✔ forced password change ✔ guards (`requireUser`, `requireRole`) ✔ `proxy.ts`
+redirects ✔ shadcn/ui + Hugeicons ✔ role shells ✔ Vitest + test database ✔
+Super Admin bootstrap script · ☐ `requireCapability` / `requireOwnClient`
+(arrive with jobs, Phase 2–4) ☐ Playwright ☐ CI.
 
 **Phase 2 (users and jobs):** ☐ user provisioning per role with temp passwords
 ☐ suspend/deactivate/revoke ☐ client numbers + printable client card ☐ work
