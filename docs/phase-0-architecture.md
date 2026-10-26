@@ -455,10 +455,21 @@ conventional")**, each changeable per job in the Options section:
 - Plans are embedded in their cutlist version instead of a separate
   cuttingPlans collection: a plan is never shared between versions.
 
-**Phase 4 (production):** ☐ tasks + queueSeq ☐ eligibility + head-of-queue
-check ☐ start/pause/resume/complete/interrupt with confirmations ☐ concurrency
-(transaction + partial unique index) ☐ reassignment ☐ timeline events ☐
-`deriveJobStatus`.
+**Phase 4 (production):** ✔ one task per stage per job, server-issued queue
+tickets ✔ queue rule (`eligibility` in `src/lib/production.ts`): an operator
+works only jobs assigned to them, strictly in ticket order per stage, one job at
+a time; edging waits for cutting ✔ start / pause (reason) / resume / complete
+(panels, waste, defects, downtime, notes) / report issue, all confirmed and
+re-checked in a transaction ✔ concurrency: conditional updates plus a unique
+index allowing one active task per operator ✔ reassignment pauses work in
+progress and keeps its sessions ✔ timeline events ✔ queues page, operator queue,
+task pages, history.
+
+**Decisions (2026-10-26):** machine count unknown, so the conventional set-up:
+one cutting and one edging queue for the workshop, operators working in
+parallel. Admins assign each stage to a specific operator. Job status is set by
+the same transaction as each task change rather than derived afterwards. No
+quality-check stage: the last stage completes the job.
 
 **Phase 5 (clients):** ☐ client dashboard ☐ progress tracker with N/A stages
 ☐ estimates history ☐ notifications (in-app; channel interface for SMS/email).

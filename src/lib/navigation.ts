@@ -1,6 +1,8 @@
 import {
   Briefcase01Icon,
   DashboardSquare01Icon,
+  WorkHistoryIcon,
+  ListViewIcon,
   IdentityCardIcon,
   Layers01Icon,
   Note01Icon,
@@ -36,6 +38,7 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
           title: "Production",
           items: [
             { href: "/admin/jobs", label: "Jobs", icon: Briefcase01Icon },
+            { href: "/admin/queues", label: "Queues", icon: ListViewIcon },
             { href: "/admin/materials", label: "Materials", icon: Layers01Icon },
           ],
         },
@@ -47,7 +50,14 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
       return sections;
     }
     case "OPERATOR":
-      return [{ items: [{ href: "/operator", label: "My queue", icon: Task01Icon }] }];
+      return [
+        {
+          items: [
+            { href: "/operator", label: "My queue", icon: Task01Icon },
+            { href: "/operator/history", label: "History", icon: WorkHistoryIcon },
+          ],
+        },
+      ];
     case "CLIENT":
       return [
         {

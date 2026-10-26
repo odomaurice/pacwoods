@@ -24,6 +24,8 @@ export default function ConfirmAction({
   description,
   confirmLabel,
   destructive = false,
+  large = false,
+  disabled = false,
   onConfirm,
 }: {
   label: string;
@@ -31,7 +33,11 @@ export default function ConfirmAction({
   description: ReactNode;
   confirmLabel: string;
   destructive?: boolean;
-  onConfirm: () => Promise<void>;
+  /** Big touch target, for the workshop floor. */
+  large?: boolean;
+  disabled?: boolean;
+  /** Return false to keep the dialog open (e.g. the form inside it is invalid). */
+  onConfirm: () => Promise<void | boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -39,7 +45,8 @@ export default function ConfirmAction({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
-        render={<Button variant={destructive ? "destructive" : "outline"} size="sm" />}
+        disabled={disabled}
+        render={<Button variant={destructive ? "destructive" : large ? "default" : "outline"} size={large ? "lg" : "sm"} className={large ? "h-12 px-6 text-base" : undefined} />}
       >
         {label}
       </AlertDialogTrigger>
@@ -55,8 +62,7 @@ export default function ConfirmAction({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await onConfirm();
-                setOpen(false);
+                if ((await onConfirm()) !== false) setOpen(false);
               })
             }
           >

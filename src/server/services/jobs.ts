@@ -10,7 +10,7 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
-import { queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
+import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
 function assertStaff(actor: Actor) {
@@ -200,6 +200,7 @@ export async function withdrawMaterials(actor: Actor, workNumber: string, reason
   await mongoose.connection.transaction(async (session) => {
     if (job.status === "QUEUED_FOR_CUTTING") {
       await transitionJob(job._id, "QUEUED_FOR_CUTTING", "AWAITING_MATERIAL", event, session, set);
+      await leaveCuttingQueue(job._id, session);
     } else if (job.status === "DRAFT") {
       const r = await Job.updateOne({ _id: job._id, status: "DRAFT" }, { $set: set }, { session });
       if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The job changed while you were working. Reload and try again.");

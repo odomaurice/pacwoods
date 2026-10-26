@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { JobStatusBadge } from "@/components/StatusBadge";
+import ViewButton from "@/components/ViewButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { describeOperations } from "@/lib/jobs";
 import type { JobRow } from "@/server/services/jobs";
@@ -18,6 +19,9 @@ export default function JobTable({ rows, showClient = true }: { rows: JobRow[]; 
             <TableHead>Operations</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
+            <TableHead className="text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -40,6 +44,9 @@ export default function JobTable({ rows, showClient = true }: { rows: JobRow[]; 
                 <JobStatusBadge status={job.status} />
               </TableCell>
               <TableCell>{dateFormat.format(job.createdAt)}</TableCell>
+              <TableCell className="text-right">
+                <ViewButton href={`/admin/jobs/${job.workNumber}`} label={`View ${job.workNumber}`} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

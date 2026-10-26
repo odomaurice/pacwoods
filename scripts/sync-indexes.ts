@@ -6,13 +6,15 @@ import { AuthThrottle } from "../src/server/db/models/AuthThrottle";
 import { ClientProfile } from "../src/server/db/models/ClientProfile";
 import { CutlistVersion } from "../src/server/db/models/CutlistVersion";
 import { JobStatusEvent } from "../src/server/db/models/JobStatusEvent";
+import { ProcessingSession } from "../src/server/db/models/ProcessingSession";
+import { ProductionTask } from "../src/server/db/models/ProductionTask";
 import { Job } from "../src/server/db/models/Job";
 import { Material } from "../src/server/db/models/Material";
 import { User } from "../src/server/db/models/User";
 
 async function main() {
   await connectDb();
-  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent]) {
+  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession]) {
     await model.syncIndexes();
     console.log(`indexes synced: ${model.collection.collectionName}`);
   }

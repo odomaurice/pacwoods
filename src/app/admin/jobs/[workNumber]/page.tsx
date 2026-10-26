@@ -5,6 +5,7 @@ import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/
 import Detail from "@/components/Detail";
 import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
 import PageHeader from "@/components/PageHeader";
+import JobProduction from "@/components/production/JobProduction";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import { describeOperations, JOB_STATUS_LABELS } from "@/lib/jobs";
@@ -29,6 +30,17 @@ const EVENT_LABELS: Record<string, string> = {
   CUTLIST_REOPENED: "Cutlist reopened for changes",
   MATERIAL_CONFIRMED: "Materials confirmed available",
   MATERIAL_WITHDRAWN: "Materials confirmation withdrawn",
+  OPERATOR_ASSIGNED: "Operator assigned",
+  CUTTING_STARTED: "Cutting started",
+  CUTTING_PAUSED: "Cutting paused",
+  CUTTING_RESUMED: "Cutting resumed",
+  CUTTING_COMPLETED: "Cutting completed",
+  EDGING_STARTED: "Edging started",
+  EDGING_PAUSED: "Edging paused",
+  EDGING_RESUMED: "Edging resumed",
+  EDGING_COMPLETED: "Edging completed",
+  JOB_COMPLETED: "Job completed",
+  ISSUE_REPORTED: "Issue reported by operator",
 };
 
 const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
@@ -122,6 +134,8 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
           )}
         </section>
       )}
+
+      <JobProduction jobId={job._id} />
 
       <section className="mb-8 rounded-lg bg-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

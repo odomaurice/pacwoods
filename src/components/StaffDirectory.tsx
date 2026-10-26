@@ -2,6 +2,7 @@ import Link from "next/link";
 import EmptyState from "@/components/EmptyState";
 import { Pagination, SearchForm, withParams } from "@/components/ListControls";
 import { AccountStatusBadge } from "@/components/StatusBadge";
+import ViewButton from "@/components/ViewButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Role } from "@/lib/roles";
 import { listUsers } from "@/server/services/users";
@@ -37,6 +38,9 @@ export default async function StaffDirectory({
                 <TableHead>Email</TableHead>
                 <TableHead>{role === "OPERATOR" ? "Capabilities" : "Permissions"}</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -58,6 +62,9 @@ export default async function StaffDirectory({
                   </TableCell>
                   <TableCell>
                     <AccountStatusBadge status={u.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <ViewButton href={`/admin/accounts/${u._id}`} label={`View ${u.name}`} />
                   </TableCell>
                 </TableRow>
               ))}

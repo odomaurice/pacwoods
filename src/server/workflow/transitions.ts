@@ -4,6 +4,7 @@ import type { JobStatus } from "@/lib/jobs";
 import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
+import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { ServiceError } from "@/server/services/users";
 
 /**
@@ -14,7 +15,10 @@ const ALLOWED: Partial<Record<JobStatus, JobStatus[]>> = {
   DRAFT: ["AWAITING_MATERIAL", "QUEUED_FOR_CUTTING", "CANCELLED"],
   AWAITING_MATERIAL: ["DRAFT", "QUEUED_FOR_CUTTING", "CANCELLED"],
   // Before an operator starts: reopen the cutlist, or withdraw the material.
-  QUEUED_FOR_CUTTING: ["DRAFT", "AWAITING_MATERIAL", "CANCELLED"],
+  QUEUED_FOR_CUTTING: ["DRAFT", "AWAITING_MATERIAL", "CUTTING_IN_PROGRESS", "CANCELLED"],
+  CUTTING_IN_PROGRESS: ["QUEUED_FOR_EDGING", "COMPLETED"],
+  QUEUED_FOR_EDGING: ["EDGING_IN_PROGRESS"],
+  EDGING_IN_PROGRESS: ["COMPLETED"],
 };
 
 export function canTransition(from: JobStatus, to: JobStatus) {
@@ -64,12 +68,38 @@ export async function recordJobEvent(jobId: Types.ObjectId, event: EventInfo, se
  * does not send it to the back of the queue.
  */
 export async function queueForCutting(
-  job: { _id: Types.ObjectId; cuttingQueueSeq?: number | null },
+  job: { _id: Types.ObjectId; workNumber: string; operations?: { edging: boolean } | null; cuttingQueueSeq?: number | null },
   from: JobStatus,
   event: EventInfo,
   session?: ClientSession,
   set: Record<string, unknown> = {},
 ) {
   const seq = job.cuttingQueueSeq ?? (await nextSequence("queue:cutting", session));
-  return transitionJob(job._id, from, "QUEUED_FOR_CUTTING", event, session, { ...set, cuttingQueueSeq: seq });
+  const updated = await transitionJob(job._id, from, "QUEUED_FOR_CUTTING", event, session, { ...set, cuttingQueueSeq: seq });
+
+  // The cutting task becomes workable; it is created the first time. A task
+  // that has already started cannot match, and the insert then fails loudly.
+  await ProductionTask.updateOne(
+    { jobId: job._id, stage: "CUTTING", status: "BLOCKED" },
+    { $set: { status: "QUEUED", queueSeq: seq, queuedAt: new Date(), workNumber: job.workNumber } },
+    { upsert: true, session },
+  );
+  if (job.operations?.edging) {
+    await ProductionTask.updateOne(
+      { jobId: job._id, stage: "EDGING" },
+      { $setOnInsert: { status: "BLOCKED", workNumber: job.workNumber } },
+      { upsert: true, session },
+    );
+  }
+  return updated;
+}
+
+/** The job left the cutting queue before work started: park its cutting task. */
+export async function leaveCuttingQueue(jobId: Types.ObjectId, session?: ClientSession) {
+  const r = await ProductionTask.updateOne(
+    { jobId, stage: "CUTTING", status: "QUEUED" },
+    { $set: { status: "BLOCKED" } },
+    { session },
+  );
+  if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "Cutting has already started on this job.");
 }

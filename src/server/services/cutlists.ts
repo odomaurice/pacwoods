@@ -10,7 +10,7 @@ import { Job } from "@/server/db/models/Job";
 import { Material } from "@/server/db/models/Material";
 import { audit } from "@/server/services/audit";
 import { ServiceError, type Actor } from "@/server/services/users";
-import { queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
+import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
 function assertStaff(actor: Actor) {
   if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") {
@@ -196,6 +196,7 @@ export async function reopenCutlist(actor: Actor, workNumber: string, reason: st
       ],
       { session },
     );
+    if (from === "QUEUED_FOR_CUTTING") await leaveCuttingQueue(job._id, session);
     await transitionJob(job._id, from, "DRAFT", {
       type: "CUTLIST_REOPENED",
       actorId: actor.id,

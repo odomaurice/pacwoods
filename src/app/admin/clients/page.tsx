@@ -5,6 +5,7 @@ import { Pagination, SearchForm, listParams, withParams } from "@/components/Lis
 import PageHeader from "@/components/PageHeader";
 import { AccountStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
+import ViewButton from "@/components/ViewButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/server/auth/guards";
 import { listClients } from "@/server/services/users";
@@ -39,7 +40,9 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                 <TableHead>Business</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Card</TableHead>
+                <TableHead className="text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -57,9 +60,12 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                     <AccountStatusBadge status={c.user.status} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link href={`/admin/clients/${c._id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                      Card
-                    </Link>
+                    <span className="inline-flex gap-2">
+                      <Link href={`/admin/clients/${c._id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                        Card
+                      </Link>
+                      <ViewButton href={`/admin/clients/${c._id}`} label={`View ${c.user.name}`} />
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}

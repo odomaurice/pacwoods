@@ -6,6 +6,8 @@ import { AuthThrottle } from "@/server/db/models/AuthThrottle";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { CutlistVersion } from "@/server/db/models/CutlistVersion";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
+import { ProcessingSession } from "@/server/db/models/ProcessingSession";
+import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { Job } from "@/server/db/models/Job";
 import { Material } from "@/server/db/models/Material";
 import { User } from "@/server/db/models/User";
@@ -26,7 +28,7 @@ export async function connectTestDb() {
   if (process.env.MONGODB_DB === "pacwoods") throw new Error("Refusing to test against the main database");
   await connectDb();
   await dropAllCollections();
-  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent]) await model.syncIndexes();
+  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession]) await model.syncIndexes();
 }
 
 export async function disconnectTestDb() {
