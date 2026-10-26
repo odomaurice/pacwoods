@@ -35,7 +35,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clients/[
         actions={
           <>
             <Link href={`/admin/clients/${id}/card`} className={buttonVariants({ variant: "outline" })}>
-              Client card
+              Print client card
             </Link>
             {user.status === "ACTIVE" && (
               <Link href={`/admin/jobs/new?client=${id}`} className={buttonVariants()}>

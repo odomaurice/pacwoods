@@ -46,8 +46,13 @@ export default function ClientForm() {
           password={created.temporaryPassword}
           extra={created.clientNumber}
         />
-        <div className="flex gap-2">
-          <Link href="/admin/clients" className={buttonVariants()}>
+        <div className="flex flex-wrap gap-2">
+          {created.clientId && (
+            <Link href={`/admin/clients/${created.clientId}/card`} className={buttonVariants()}>
+              Print client card
+            </Link>
+          )}
+          <Link href="/admin/clients" className={buttonVariants({ variant: "outline" })}>
             Done
           </Link>
           <Button variant="outline" onClick={() => setCreated(undefined)}>

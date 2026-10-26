@@ -107,6 +107,14 @@
   --sidebar-ring: #d99e56;
 }
 
+/* Scrollable without a visible scrollbar (the sidebar). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Keep brand fills (cards, labels) when printing. */
 @media print {
   * {

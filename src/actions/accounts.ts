@@ -22,7 +22,7 @@ import {
 } from "@/server/services/users";
 
 export type CreatedAccount =
-  | { ok: true; name: string; login: string; temporaryPassword: string; clientNumber?: string }
+  | { ok: true; name: string; login: string; temporaryPassword: string; clientNumber?: string; clientId?: string }
   | { ok: false; error: string };
 
 export type AccountActionResult =
@@ -64,6 +64,7 @@ export async function createClientAction(input: ClientAccountInput): Promise<Cre
       login: user.phone ?? user.email!,
       temporaryPassword,
       clientNumber: profile.clientNumber,
+      clientId: profile._id.toString(),
     };
   } catch (error) {
     return failure(error);

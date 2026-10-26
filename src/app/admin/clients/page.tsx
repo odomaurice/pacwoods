@@ -39,6 +39,7 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                 <TableHead>Business</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Card</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -54,6 +55,11 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                   <TableCell>{c.user.phone ?? c.user.email ?? "—"}</TableCell>
                   <TableCell>
                     <AccountStatusBadge status={c.user.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link href={`/admin/clients/${c._id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      Card
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

@@ -1,6 +1,7 @@
 import {
   Briefcase01Icon,
   DashboardSquare01Icon,
+  IdentityCardIcon,
   Layers01Icon,
   Note01Icon,
   Task01Icon,
@@ -48,6 +49,13 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
     case "OPERATOR":
       return [{ items: [{ href: "/operator", label: "My queue", icon: Task01Icon }] }];
     case "CLIENT":
-      return [{ items: [{ href: "/client", label: "My jobs", icon: Briefcase01Icon }] }];
+      return [
+        {
+          items: [
+            { href: "/client", label: "My jobs", icon: Briefcase01Icon },
+            { href: "/client/card", label: "My card", icon: IdentityCardIcon },
+          ],
+        },
+      ];
   }
 }

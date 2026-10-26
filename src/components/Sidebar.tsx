@@ -39,7 +39,7 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
         <Wordmark />
       </div>
 
-      <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto">
+      <nav aria-label="Main" className="no-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto">
         {sections.map((section, i) => (
           <div key={section.title ?? i} className="space-y-1">
             {section.title && (
