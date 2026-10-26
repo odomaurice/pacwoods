@@ -3,271 +3,440 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Camera01Icon,
-  Layers01Icon,
-  Notification01Icon,
-  QrCodeIcon,
-  RulerIcon,
-  Task01Icon,
-} from "@hugeicons/core-free-icons";
-import PlanDrawing from "@/components/cutlist/PlanDrawing";
+import { ArrowDown01Icon, Camera01Icon, Menu01Icon, Notification01Icon, QrCodeIcon, Task01Icon } from "@hugeicons/core-free-icons";
+import HeroPlan from "@/components/home/HeroPlan";
+import Planner from "@/components/home/Planner";
+import Reveal from "@/components/home/Reveal";
+import WoodGrain from "@/components/home/WoodGrain";
 import Logo, { LogoMark } from "@/components/Logo";
 import { buttonVariants } from "@/components/ui/button";
-import { optimise } from "@/lib/cutting/engine";
-import { PART_FILLS } from "@/lib/plan-view";
 import { roleHome } from "@/lib/roles";
-import { STANDARD_MATERIALS } from "@/lib/standard-materials";
+import { cn } from "@/lib/utils";
 import { getSessionUser } from "@/server/auth/guards";
+import { publicStats } from "@/server/services/publicStats";
 
 export const metadata: Metadata = {
   title: "Pacwoods | Industrial Wood Processing Centre",
-  description: "Panel cutting, CNC machining and edge-banding services, with every job tracked from cutlist to collection.",
+  description: "Panel cutting, CNC machining and edge-banding services. Every job planned to save board and tracked online from cutlist to collection.",
 };
 
-/**
- * A real layout from the cutting engine, drawn by the same component the
- * workshop uses: kitchen carcass panels on one 2440 × 1220 sheet.
- */
-function exampleSheet() {
-  const edges = (l1: boolean, l2: boolean) => ({ length1: l1, length2: l2, width1: false, width2: false });
-  const parts = [
-    { ref: "A", label: "Side", length: 720, width: 560, quantity: 2, grain: "NONE" as const, edges: edges(true, false) },
-    { ref: "B", label: "Shelf", length: 764, width: 520, quantity: 2, grain: "NONE" as const, edges: edges(true, false) },
-    { ref: "C", label: "Door", length: 715, width: 396, quantity: 2, grain: "NONE" as const, edges: edges(true, true) },
-  ];
-  const plan = optimise(parts, [{ ref: "S", length: 2440, width: 1220, quantity: 1, grained: false }], {
-    kerf: 4,
-    edgeTrim: 0,
-    considerMaterial: false,
-    considerGrain: false,
-    deductEdgeBanding: false,
-    edgeBandThickness: 1,
-    singleSheet: true,
-  });
-  return {
-    sheet: plan.sheets[0],
-    parts: new Map(parts.map((p, i) => [p.ref, { ref: p.ref, label: p.label, fill: PART_FILLS[i], edges: p.edges }])),
-    utilisation: plan.sheets[0]?.utilization ?? 0,
-  };
+/* Small line drawings for each service, in the brand colours. */
+function SawArt() {
+  return (
+    <svg viewBox="0 0 160 100" className="h-24 w-auto" aria-hidden>
+      <rect x="6" y="58" width="148" height="20" rx="2" fill="#D99E56" />
+      <path d="M6 64h148M6 71h148" stroke="#B57F3E" strokeWidth="1" />
+      <g className="origin-[80px_44px] transition-transform duration-700 group-hover:rotate-180">
+        <circle cx="80" cy="44" r="26" fill="#E7E8EA" />
+        {Array.from({ length: 16 }, (_, i) => (
+          <path key={i} d="M80 15 l4 6 h-8z" fill="#E7E8EA" transform={`rotate(${i * 22.5} 80 44)`} />
+        ))}
+        <circle cx="80" cy="44" r="6" fill="#1B2328" />
+      </g>
+      <path d="M80 58v20" stroke="#C0392B" strokeWidth="2" strokeDasharray="3 3" />
+    </svg>
+  );
+}
+function CncArt() {
+  return (
+    <svg viewBox="0 0 160 100" className="h-24 w-auto" aria-hidden>
+      <rect x="10" y="20" width="140" height="70" rx="4" fill="#D99E56" />
+      <path d="M30 40 h40 a12 12 0 0 1 12 12 v10 a12 12 0 0 0 12 12 h36" fill="none" stroke="#1B2328" strokeWidth="5" strokeLinecap="round" className="[stroke-dasharray:180] [stroke-dashoffset:180] transition-[stroke-dashoffset] duration-1000 group-hover:[stroke-dashoffset:0]" />
+      <path d="M30 40 h40 a12 12 0 0 1 12 12 v10 a12 12 0 0 0 12 12 h36" fill="none" stroke="#B57F3E" strokeWidth="5" strokeLinecap="round" opacity="0.35" />
+      <rect x="124" y="4" width="12" height="30" rx="2" fill="#E7E8EA" />
+      <path d="M130 34 v6" stroke="#E7E8EA" strokeWidth="3" />
+    </svg>
+  );
+}
+function EdgeArt() {
+  return (
+    <svg viewBox="0 0 160 100" className="h-24 w-auto" aria-hidden>
+      <rect x="10" y="40" width="110" height="44" rx="2" fill="#F2EDE4" />
+      <rect x="10" y="40" width="110" height="8" fill="#D99E56" className="origin-left scale-x-[0.35] transition-transform duration-700 group-hover:scale-x-100" />
+      <circle cx="138" cy="34" r="18" fill="#D99E56" />
+      <circle cx="138" cy="34" r="7" fill="#1B2328" />
+      <path d="M120 44 L138 52" stroke="#D99E56" strokeWidth="6" />
+    </svg>
+  );
 }
 
 const SERVICES = [
-  {
-    icon: RulerIcon,
-    title: "Panel cutting",
-    text: "Boards cut to your sizes on the panel saw, from a cutting plan that fits your panels onto as few sheets as possible.",
-  },
-  {
-    icon: Layers01Icon,
-    title: "CNC machining",
-    text: "Machined shapes and details for cabinet and furniture parts.",
-  },
-  {
-    icon: Task01Icon,
-    title: "Edge banding",
-    text: "Clean, banded edges on exactly the sides you choose, panel by panel.",
-  },
+  { art: <SawArt />, title: "Panel cutting", text: "Your boards cut to size on the panel saw, from a cutting plan that fits your panels onto as few sheets as possible." },
+  { art: <CncArt />, title: "CNC machining", text: "Machined shapes, grooves and details for cabinet and furniture parts." },
+  { art: <EdgeArt />, title: "Edge banding", text: "Clean edges on exactly the sides you choose, panel by panel, after cutting." },
 ];
 
 const STEPS = [
   { title: "Register your order", text: "Bring your sizes to the counter. You get a client number and a work number for every job." },
-  { title: "We plan the cutting", text: "Your panels are laid out on the sheets to waste as little board as possible, and the plan is checked before anything is cut." },
-  { title: "Cut, then edged, in order", text: "Jobs are worked first come, first served. Edging starts only after cutting is finished." },
-  { title: "Collect your finished work", text: "You are notified when your job is complete, with photos of the finished panels." },
+  { title: "We plan the cutting", text: "Your panels are laid out to waste as little board as possible, and the plan is checked before anything is cut." },
+  { title: "Cut, then edged, in order", text: "First come, first served. Edging starts only when cutting is finished." },
+  { title: "Collect your work", text: "You are told when it is ready, with photos of the finished panels." },
 ];
 
 const TRACKING = [
-  { icon: Task01Icon, title: "Live progress", text: "See each step of your job as it happens, with dates and times, and who is cutting it." },
-  { icon: QrCodeIcon, title: "Job card with QR code", text: "Every job has a printable card listing your panels, sizes, materials and edged sides." },
-  { icon: Camera01Icon, title: "Photos", text: "Pictures of your wood when it arrives and of the finished work before it leaves the machine." },
+  { icon: Task01Icon, title: "Live progress", text: "Each step of your job with its date and time, and who is cutting it." },
+  { icon: QrCodeIcon, title: "Job card with QR code", text: "Your panels, sizes, materials and edged sides on one printable card." },
+  { icon: Camera01Icon, title: "Photos", text: "Your wood when it arrives, and the finished work before it leaves the machine." },
   { icon: Notification01Icon, title: "Notifications", text: "A message when cutting starts, when it finishes, and when your job is ready." },
 ];
 
-function Section({ id, eyebrow, title, children, tone = "light" }: { id: string; eyebrow: string; title: string; children: ReactNode; tone?: "light" | "white" | "dark" }) {
-  const bg = tone === "dark" ? "bg-brand-charcoal text-white" : tone === "white" ? "bg-white" : "bg-background";
+const MATERIALS = [
+  { name: "MDF", tone: "#C9A77C" },
+  { name: "Melamine-faced board", tone: "#F4F1EA" },
+  { name: "Plywood", tone: "#D9B887" },
+  { name: "Chipboard", tone: "#C2A27A" },
+  { name: "Blockboard", tone: "#B88E5A" },
+  { name: "OSB", tone: "#C79A57" },
+  { name: "Hardboard", tone: "#7E5E40" },
+];
+
+function Eyebrow({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
+  return <p className={cn("text-xs font-semibold tracking-[0.3em] uppercase", dark ? "text-brand-gold" : "text-brand-gold-deep")}>{children}</p>;
+}
+
+/** A phone showing the client's progress view; clearly an example. */
+function PhoneExample() {
+  const steps: Array<[string, string, "done" | "now" | "next" | "na"]> = [
+    ["Order registered", "Mon 09:14", "done"],
+    ["Cutlist approved", "Mon 11:02", "done"],
+    ["Materials ready", "Mon 11:30", "done"],
+    ["Cutting started", "Tue 08:05 · Cutting operator: Olu", "done"],
+    ["Cutting completed", "Next", "now"],
+    ["Edging", "", "next"],
+    ["Ready for collection", "", "next"],
+  ];
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className={`${bg} scroll-mt-16 px-4 py-16 sm:px-8 sm:py-24`}>
-      <div className="mx-auto max-w-6xl">
-        <p className={`text-xs font-semibold tracking-[0.25em] uppercase ${tone === "dark" ? "text-brand-gold" : "text-brand-gold-deep"}`}>{eyebrow}</p>
-        <h2 id={`${id}-title`} className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-          {title}
-        </h2>
-        <div className="mt-10">{children}</div>
+    <div className="pw-float mx-auto w-[280px] rounded-[2.5rem] bg-brand-charcoal p-3 shadow-2xl shadow-black/40 ring-1 ring-white/10">
+      <div className="overflow-hidden rounded-[2rem] bg-[#F6F6F4] text-brand-charcoal">
+        <div className="flex items-center justify-between bg-brand-charcoal px-4 py-3 text-white">
+          <span className="text-sm font-extrabold">
+            Pa<span className="text-brand-gold">C</span> WOODS
+          </span>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px]">Example</span>
+        </div>
+        <div className="space-y-3 p-4">
+          <div>
+            <p className="font-mono text-sm font-semibold">PAC-2026-000128</p>
+            <p className="text-xs text-brand-slate">Kitchen cabinets · Cutting and edging</p>
+          </div>
+          <ol className="space-y-2.5">
+            {steps.map(([label, sub, state]) => (
+              <li key={label} className="flex gap-2.5">
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                    state === "done" && "bg-brand-gold text-brand-charcoal",
+                    state === "now" && "bg-brand-charcoal text-white ring-4 ring-brand-gold/30",
+                    state === "next" && "bg-black/10",
+                  )}
+                >
+                  {state === "done" ? "✓" : ""}
+                </span>
+                <span className="text-xs leading-tight">
+                  <span className={cn("block font-medium", state === "next" && "text-brand-slate")}>{label}</span>
+                  {sub && <span className="block text-brand-slate">{sub}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
 export default async function Home() {
-  const user = await getSessionUser();
+  const [user, stats] = await Promise.all([getSessionUser(), publicStats()]);
   const account = user && !user.mustChangePassword ? { href: roleHome(user.role), label: "Go to my dashboard" } : { href: "/login", label: "Sign in" };
-  const example = exampleSheet();
-  const materials = [...new Set(STANDARD_MATERIALS.map((m) => m.category))];
+  const nav = [
+    { href: "#services", label: "Services" },
+    { href: "#planner", label: "Try the planner" },
+    { href: "#how", label: "How it works" },
+    { href: "#tracking", label: "Track your job" },
+  ];
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-30 bg-brand-charcoal/95 text-white backdrop-blur supports-[backdrop-filter]:bg-brand-charcoal/85">
-        <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3 sm:px-8">
+    <div className="flex flex-1 flex-col bg-brand-charcoal">
+      <header className="fixed inset-x-0 top-0 z-40 bg-brand-charcoal/80 text-white backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-8">
           <Link href="/" className="text-lg" aria-label="Pacwoods home">
             <Logo />
           </Link>
-          <nav aria-label="Sections" className="ml-auto hidden gap-6 text-sm text-white/85 md:flex">
-            <a href="#services" className="hover:text-white">
-              Services
-            </a>
-            <a href="#how" className="hover:text-white">
-              How it works
-            </a>
-            <a href="#tracking" className="hover:text-white">
-              Track your job
-            </a>
-            <a href="#materials" className="hover:text-white">
-              Materials
-            </a>
+          <nav aria-label="Sections" className="ml-auto hidden gap-7 text-sm text-white/80 lg:flex">
+            {nav.map((n) => (
+              <a key={n.href} href={n.href} className="transition-colors hover:text-brand-gold">
+                {n.label}
+              </a>
+            ))}
           </nav>
-          <Link href={account.href} className={buttonVariants({ className: "ml-auto bg-brand-gold text-brand-charcoal hover:bg-brand-gold/90 md:ml-0" })}>
+          <Link href={account.href} className={buttonVariants({ variant: "gold", className: "ml-auto lg:ml-0" })}>
             {account.label}
           </Link>
+          <details className="relative lg:hidden">
+            <summary className="flex size-10 items-center justify-center rounded-md hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label="Menu">
+              <HugeiconsIcon icon={Menu01Icon} className="size-6" />
+            </summary>
+            <nav aria-label="Sections" className="absolute right-0 mt-2 w-56 rounded-lg bg-brand-charcoal p-2 shadow-2xl ring-1 ring-white/10">
+              {nav.map((n) => (
+                <a key={n.href} href={n.href} className="block rounded-md px-3 py-2.5 text-white/90 hover:bg-white/10">
+                  {n.label}
+                </a>
+              ))}
+            </nav>
+          </details>
         </div>
       </header>
 
       <main className="flex-1">
         {/* Hero */}
-        <section aria-labelledby="hero-title" className="bg-brand-charcoal px-4 pt-12 pb-16 text-white sm:px-8 sm:pt-20 sm:pb-24">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
+        <section aria-labelledby="hero-title" className="relative isolate flex min-h-[min(100svh,980px)] items-center overflow-hidden px-4 pt-28 pb-16 text-white sm:px-8">
+          <WoodGrain className="-z-10 text-white/[0.06]" />
+          <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[1fr_1.05fr]">
             <div>
-              <p className="text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase sm:text-sm">Industrial Wood Processing Centre</p>
-              <h1 id="hero-title" className="mt-4 text-4xl leading-tight font-semibold tracking-tight sm:text-6xl">
-                Precision processing.
+              <div className="mb-6 flex items-center gap-3">
+                <LogoMark className="h-12 w-auto" />
+                <Eyebrow dark>Industrial Wood Processing Centre</Eyebrow>
+              </div>
+              <h1 id="hero-title" className="text-5xl leading-[1.02] font-semibold tracking-tight sm:text-7xl xl:text-8xl">
+                Precision
+                <br />
+                processing.
                 <br />
                 <span className="text-brand-gold">Better production.</span>
               </h1>
-              <p className="mt-6 max-w-xl text-lg text-white/90">
-                Panel cutting, CNC machining and edge banding, with every job planned to save board and tracked from your cutlist to collection.
+              <p className="mt-7 max-w-xl text-lg text-white/85 sm:text-xl">
+                Panel cutting, CNC machining and edge banding. Every job planned to save board, worked in order, and tracked online from your cutlist to collection.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link href={account.href} className={buttonVariants({ size: "lg", className: "h-12 bg-brand-gold px-6 text-base text-brand-charcoal hover:bg-brand-gold/90" })}>
-                  {user ? account.label : "Sign in to track your job"}
+              <div className="mt-9 flex flex-wrap gap-3">
+                <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: "h-14 px-7 text-base" })}>
+                  {user ? account.label : "Track my job"}
                 </Link>
-                <a href="#services" className={buttonVariants({ size: "lg", variant: "outline", className: "h-12 border-white/30 bg-transparent px-6 text-base text-white hover:bg-white/10 hover:text-white" })}>
-                  Our services
+                <a href="#planner" className={buttonVariants({ variant: "onDark", size: "lg", className: "h-14 px-7 text-base" })}>
+                  Try the cutting planner
                 </a>
               </div>
-              <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/80">
-                <li>Panel cutting</li>
-                <li aria-hidden>·</li>
-                <li>CNC machining</li>
-                <li aria-hidden>·</li>
-                <li>Edge-banding services</li>
-              </ul>
             </div>
-
-            {example.sheet && (
-              <figure className="rounded-xl bg-white p-3 text-brand-charcoal shadow-2xl shadow-black/30 sm:p-4">
-                <PlanDrawing
-                  sheet={example.sheet}
-                  parts={example.parts}
-                  count={1}
-                  stockLabel="MDF 18 mm"
-                  portrait={false}
-                  fontScale={1}
-                  rulers
-                  showCuts={false}
-                  showLabels
-                />
-                <figcaption className="mt-2 flex flex-wrap justify-between gap-2 px-1 text-xs text-brand-slate">
-                  <span>A cutting plan from our optimiser: six kitchen panels on one sheet, edged sides in gold.</span>
-                  <span className="font-semibold text-brand-charcoal">{Math.round(example.utilisation * 100)}% of the sheet used</span>
-                </figcaption>
-              </figure>
-            )}
+            <HeroPlan />
           </div>
+          <a href="#services" aria-label="Scroll to services" className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-white/50 hover:text-white sm:block">
+            <HugeiconsIcon icon={ArrowDown01Icon} className="size-7 animate-bounce" />
+          </a>
         </section>
 
-        <Section id="services" eyebrow="What we do" title="Board processing for cabinet makers, carpenters and interior projects" tone="white">
-          <ul className="grid gap-6 md:grid-cols-3">
-            {SERVICES.map((s) => (
-              <li key={s.title} className="rounded-xl bg-background p-6">
-                <span className="flex size-12 items-center justify-center rounded-lg bg-brand-charcoal text-brand-gold">
-                  <HugeiconsIcon icon={s.icon} className="size-6" />
-                </span>
-                <h3 className="mt-5 text-xl font-semibold">{s.title}</h3>
-                <p className="mt-2 text-brand-slate">{s.text}</p>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        {stats && (
+          <section aria-label="Pacwoods in numbers" className="border-y border-white/10 px-4 py-10 text-white sm:px-8">
+            <dl className="mx-auto grid max-w-7xl grid-cols-2 gap-8 md:grid-cols-4">
+              {[
+                ["Jobs completed", stats.completed.toLocaleString("en-GB")],
+                ["Sheets planned", stats.sheets.toLocaleString("en-GB")],
+                ["Average board used", `${Math.round(stats.utilisation * 100)}%`],
+                ["Clients", stats.clients.toLocaleString("en-GB")],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dd className="text-4xl font-semibold text-brand-gold tabular-nums sm:text-5xl">{v}</dd>
+                  <dt className="mt-1 text-sm text-white/70">{k}</dt>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
 
-        <Section id="how" eyebrow="How it works" title="From your sizes to finished panels">
-          <ol className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((s, i) => (
-              <li key={s.title} className="relative rounded-xl bg-white p-6">
-                <span className="text-4xl font-semibold text-brand-gold tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                <h3 className="mt-3 text-lg font-semibold">{s.title}</h3>
-                <p className="mt-2 text-sm text-brand-slate">{s.text}</p>
-              </li>
+        {/* Ticker */}
+        <div aria-hidden className="overflow-hidden bg-brand-gold py-4 text-brand-charcoal">
+          <div className="pw-marquee flex w-max gap-10 text-xl font-semibold tracking-[0.2em] whitespace-nowrap uppercase sm:text-2xl">
+            {Array.from({ length: 2 }, (_, k) => (
+              <span key={k} className="flex gap-10">
+                {["Panel cutting", "CNC machining", "Edge banding", "Optimised cutting plans", "Job tracking", "Precision processing"].map((t) => (
+                  <span key={t} className="flex items-center gap-10">
+                    {t} <span className="text-brand-charcoal/40">✦</span>
+                  </span>
+                ))}
+              </span>
             ))}
-          </ol>
-        </Section>
+          </div>
+        </div>
 
-        <Section id="tracking" eyebrow="Track your job" title="See exactly where your job is, any time" tone="dark">
-          <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr]">
-            <div className="space-y-5 text-white/90">
-              <p className="text-lg">
-                Every client gets their own account. Sign in with the phone number you registered with and follow each job from the counter to collection.
-              </p>
-              <Link href={account.href} className={buttonVariants({ size: "lg", className: "h-12 bg-brand-gold px-6 text-base text-brand-charcoal hover:bg-brand-gold/90" })}>
-                {account.label}
-              </Link>
-            </div>
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {TRACKING.map((t) => (
-                <li key={t.title} className="rounded-xl bg-white/5 p-5">
-                  <HugeiconsIcon icon={t.icon} className="size-6 text-brand-gold" />
-                  <h3 className="mt-3 font-semibold">{t.title}</h3>
-                  <p className="mt-1 text-sm text-white/80">{t.text}</p>
+        {/* Services */}
+        <section id="services" aria-labelledby="services-title" className="scroll-mt-20 bg-[#F6F6F4] px-4 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-7xl">
+            <Reveal>
+              <Eyebrow>What we do</Eyebrow>
+              <h2 id="services-title" className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-brand-charcoal sm:text-5xl">
+                Board processing for cabinet makers, carpenters and interiors.
+              </h2>
+            </Reveal>
+            <ul className="mt-14 grid gap-6 md:grid-cols-3">
+              {SERVICES.map((s, i) => (
+                <li key={s.title}>
+                  <Reveal delay={i * 120} className="h-full">
+                    <article className="group flex h-full flex-col rounded-2xl bg-white p-7 shadow-sm ring-1 ring-black/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+                      <div className="flex h-32 items-center justify-center rounded-xl bg-brand-charcoal">{s.art}</div>
+                      <p className="mt-6 text-sm font-semibold text-brand-gold-deep tabular-nums">0{i + 1}</p>
+                      <h3 className="mt-1 text-2xl font-semibold text-brand-charcoal">{s.title}</h3>
+                      <p className="mt-3 text-brand-slate">{s.text}</p>
+                    </article>
+                  </Reveal>
                 </li>
               ))}
             </ul>
           </div>
-        </Section>
+        </section>
 
-        <Section id="materials" eyebrow="Materials" title="The sheet materials we cut and edge" tone="white">
-          <ul className="flex flex-wrap gap-3">
-            {materials.map((m) => (
-              <li key={m} className="rounded-full bg-background px-5 py-2.5 font-medium">
-                {m}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-brand-slate">Common thicknesses on standard 2440 × 1220 mm sheets. Ask at the counter about anything else.</p>
-        </Section>
+        {/* Planner */}
+        <section id="planner" aria-labelledby="planner-title" className="relative isolate scroll-mt-20 overflow-hidden px-4 py-20 text-white sm:px-8 sm:py-28">
+          <WoodGrain className="-z-10 text-white/[0.05]" />
+          <div className="mx-auto max-w-7xl">
+            <Reveal>
+              <Eyebrow dark>Try the planner</Eyebrow>
+              <h2 id="planner-title" className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
+                See how your panels fit, before you come in.
+              </h2>
+              <p className="mt-4 max-w-2xl text-lg text-white/80">The same optimiser we use in the workshop. Type your sizes and watch the layout change.</p>
+            </Reveal>
+            <div className="mt-12">
+              <Planner />
+            </div>
+          </div>
+        </section>
 
-        <section aria-label="Our workshop" className="bg-background px-4 pb-16 sm:px-8 sm:pb-24">
-          <div className="mx-auto max-w-6xl overflow-hidden rounded-xl">
-            <Image
-              src="/workshop-sign.webp"
-              alt="The Pacwoods workshop sign: Industrial Wood Processing Centre, panel cutting, CNC machining and edge-banding services."
-              width={1080}
-              height={360}
-              sizes="(min-width: 1152px) 1088px, calc(100vw - 32px)"
-              className="h-auto w-full"
-            />
+        {/* How it works */}
+        <section id="how" aria-labelledby="how-title" className="scroll-mt-20 bg-white px-4 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-7xl">
+            <Reveal>
+              <Eyebrow>How it works</Eyebrow>
+              <h2 id="how-title" className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-brand-charcoal sm:text-5xl">
+                From your sizes to finished panels.
+              </h2>
+            </Reveal>
+            <ol className="relative mt-14 grid gap-10 md:grid-cols-4 md:gap-6">
+              <span aria-hidden className="absolute top-7 right-8 left-8 hidden h-0.5 bg-brand-gold/40 md:block" />
+              {STEPS.map((s, i) => (
+                <li key={s.title} className="relative">
+                  <Reveal delay={i * 150}>
+                    <span className="relative z-10 flex size-14 items-center justify-center rounded-full bg-brand-charcoal text-xl font-semibold text-brand-gold ring-8 ring-white">
+                      {i + 1}
+                    </span>
+                    <h3 className="mt-5 text-xl font-semibold text-brand-charcoal">{s.title}</h3>
+                    <p className="mt-2 text-brand-slate">{s.text}</p>
+                  </Reveal>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* Tracking */}
+        <section id="tracking" aria-labelledby="tracking-title" className="relative isolate scroll-mt-20 overflow-hidden px-4 py-20 text-white sm:px-8 sm:py-28">
+          <WoodGrain className="-z-10 text-white/[0.05]" />
+          <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.1fr_1fr]">
+            <div>
+              <Reveal>
+                <Eyebrow dark>Track your job</Eyebrow>
+                <h2 id="tracking-title" className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+                  Know exactly where your job is. Any time.
+                </h2>
+                <p className="mt-4 max-w-xl text-lg text-white/80">Sign in with the phone number you registered with and follow every job from the counter to collection.</p>
+              </Reveal>
+              <ul className="mt-10 grid gap-5 sm:grid-cols-2">
+                {TRACKING.map((t, i) => (
+                  <li key={t.title}>
+                    <Reveal delay={i * 100}>
+                      <span className="flex size-11 items-center justify-center rounded-lg bg-brand-gold/15 text-brand-gold">
+                        <HugeiconsIcon icon={t.icon} className="size-6" />
+                      </span>
+                      <h3 className="mt-3 font-semibold">{t.title}</h3>
+                      <p className="mt-1 text-sm text-white/75">{t.text}</p>
+                    </Reveal>
+                  </li>
+                ))}
+              </ul>
+              <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: "mt-10 h-14 px-7 text-base" })}>
+                {account.label}
+              </Link>
+            </div>
+            <Reveal delay={150}>
+              <PhoneExample />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Materials */}
+        <section id="materials" aria-labelledby="materials-title" className="scroll-mt-20 bg-[#F6F6F4] px-4 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto max-w-7xl">
+            <Reveal>
+              <Eyebrow>Materials</Eyebrow>
+              <h2 id="materials-title" className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-brand-charcoal sm:text-5xl">
+                The sheet materials we cut and edge.
+              </h2>
+            </Reveal>
+            <ul className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
+              {MATERIALS.map((m, i) => (
+                <li key={m.name}>
+                  <Reveal delay={i * 70}>
+                    <div className="overflow-hidden rounded-xl bg-white ring-1 ring-black/5 transition hover:-translate-y-1 hover:shadow-lg">
+                      <div className="relative h-24" style={{ background: m.tone }}>
+                        <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="absolute inset-0 h-full w-full text-black/10" aria-hidden>
+                          <path d="M0 10 C 30 6, 60 14, 100 9 M0 22 C 25 18, 70 27, 100 21 M0 33 C 40 30, 60 37, 100 32" fill="none" stroke="currentColor" strokeWidth="0.8" />
+                        </svg>
+                      </div>
+                      <p className="p-3 text-sm font-medium text-brand-charcoal">{m.name}</p>
+                    </div>
+                  </Reveal>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-brand-slate">Common thicknesses on standard 2440 × 1220 mm sheets. Ask at the counter about anything else.</p>
+          </div>
+        </section>
+
+        {/* Workshop */}
+        <section aria-label="The workshop" className="bg-[#F6F6F4] px-4 pb-20 sm:px-8 sm:pb-28">
+          <Reveal className="mx-auto max-w-7xl">
+            <figure className="overflow-hidden rounded-2xl shadow-xl">
+              <Image
+                src="/workshop-sign.webp"
+                alt="The Pacwoods workshop sign: Industrial Wood Processing Centre, panel cutting, CNC machining and edge-banding services."
+                width={1080}
+                height={360}
+                sizes="(min-width: 1280px) 1216px, calc(100vw - 32px)"
+                className="h-auto w-full"
+              />
+            </figure>
+          </Reveal>
+        </section>
+
+        {/* Call to action */}
+        <section aria-labelledby="cta-title" className="bg-brand-gold px-4 py-16 text-brand-charcoal sm:px-8 sm:py-20">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-8">
+            <h2 id="cta-title" className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-5xl">
+              Already a Pacwoods client? Your jobs are waiting.
+            </h2>
+            <Link href={account.href} className={buttonVariants({ variant: "dark", size: "lg", className: "h-14 px-8 text-base" })}>
+              {account.label}
+            </Link>
           </div>
         </section>
       </main>
 
-      <footer className="bg-brand-charcoal px-4 py-10 text-white sm:px-8">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-6">
-          <LogoMark className="h-10 w-auto" />
-          <div className="text-sm">
-            <p className="font-semibold">Pacwoods · Industrial Wood Processing Centre</p>
-            <p className="text-white/70">A joint venture of Ominya Interiors & PAN Gas</p>
+      <footer className="px-4 py-12 text-white sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-[1fr_auto]">
+          <div className="space-y-3">
+            <span className="text-xl">
+              <Logo />
+            </span>
+            <p className="text-sm text-white/70">Industrial Wood Processing Centre · Panel cutting · CNC machining · Edge-banding services</p>
+            <p className="text-sm text-white/50">A joint venture of Ominya Interiors & PAN Gas</p>
           </div>
-          <Link href={account.href} className="ml-auto text-sm text-white/85 underline-offset-4 hover:text-white hover:underline">
-            {account.label}
-          </Link>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/80 sm:flex-col">
+            {nav.map((n) => (
+              <a key={n.href} href={n.href} className="hover:text-brand-gold">
+                {n.label}
+              </a>
+            ))}
+            <Link href={account.href} className="hover:text-brand-gold">
+              {account.label}
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>

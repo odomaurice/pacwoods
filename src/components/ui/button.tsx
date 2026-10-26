@@ -17,6 +17,10 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // Pacwoods brand buttons, for charcoal and gold grounds.
+        gold: "bg-brand-gold text-brand-charcoal hover:bg-[#e5ad68]",
+        dark: "bg-brand-charcoal text-white hover:bg-brand-charcoal/90",
+        onDark: "border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white",
       },
       size: {
         default:

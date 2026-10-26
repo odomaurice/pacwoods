@@ -30,7 +30,7 @@ export default async function AdminOverview() {
             <Link href="/admin/clients/new" className={buttonVariants({ variant: "secondary" })}>
               Register client
             </Link>
-            <Link href="/admin/jobs/new" className={buttonVariants({ className: "bg-brand-gold text-brand-charcoal hover:bg-brand-gold/90" })}>
+            <Link href="/admin/jobs/new" className={buttonVariants({ variant: "gold" })}>
               New job
             </Link>
           </>

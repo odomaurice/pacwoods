@@ -40,7 +40,7 @@ export default async function OperatorOverview() {
           { label: "My open reports", value: openIssues, href: "/operator", alert: true },
         ]}
         actions={
-          <Link href="/operator/queue" className={buttonVariants({ className: "bg-brand-gold text-brand-charcoal hover:bg-brand-gold/90" })}>
+          <Link href="/operator/queue" className={buttonVariants({ variant: "gold" })}>
             Open my queue
           </Link>
         }

@@ -57,6 +57,17 @@ business owner. Leave a marked gap and ask.
   an unrelated npm package called `cn`: afterwards, point the import at
   `@/lib/utils` and `npm uninstall cn`.
 - No decorative gradients, glows or fake charts.
+- The public homepage (`/`) is the exception for atmosphere: wood-grain
+  texture, motion and scroll reveals are allowed there (all switched off for
+  reduced motion; content must stay visible without JavaScript). App screens
+  stay flat.
+- Buttons on charcoal or gold grounds use the `gold`, `dark` and `onDark`
+  button variants, not a `className` background override (the default
+  variant's background wins).
+- Check layout with screenshots: headless Edge
+  (`--headless=new --user-data-dir=<fresh dir> --screenshot`, one at a time
+  with `Start-Process -Wait`). Windows clamps the window to ~500px, so test
+  phones by loading the page in a 390px iframe.
 
 ## Assets
 
