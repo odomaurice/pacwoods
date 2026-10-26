@@ -56,7 +56,19 @@ export type Placement = {
   rotated: boolean;
 };
 
-export type Cut = { x1: number; y1: number; x2: number; y2: number; order: number };
+export type Cut = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  order: number;
+  /** "y": a horizontal cut at y = at; "x": a vertical cut at x = at (both from the source's top-left). */
+  axis?: "x" | "y";
+  at?: number;
+  /** The piece being cut, and the two pieces it leaves (null = only kerf). Absent in plans made before guillotine-2. */
+  source?: Rect;
+  pieces?: [Rect, Rect | null];
+};
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -96,6 +108,8 @@ export type PlanTotals = {
   sheetLowerBound: number;
   edgingLengthMm: number;
   cutCount: number;
+  /** Total length of all saw cuts, mm. */
+  cutLength?: number;
 };
 
 export type Plan = {

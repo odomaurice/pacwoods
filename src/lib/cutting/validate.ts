@@ -53,6 +53,21 @@ export function validatePlan(plan: Plan, parts: PartInput[], stocks: StockInput[
     });
   }
 
+  // The recorded cuts must actually produce every panel: each placement is
+  // one of the pieces a cut leaves, or the whole usable sheet.
+  for (const sheet of plan.sheets) {
+    if (!sheet.cuts.every((c) => c.pieces)) continue; // plans made before cut records
+    const same = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
+      a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+    const pieces = sheet.cuts.flatMap((c) => c.pieces!.filter((r): r is NonNullable<typeof r> => r !== null));
+    const whole = { x: t, y: t, w: sheet.length - 2 * t, h: sheet.width - 2 * t };
+    for (const p of sheet.placements) {
+      if (!pieces.some((r) => same(r, p)) && !same(whole, p)) {
+        errors.push(`Sheet ${sheet.index}: no cut produces ${p.partRef}#${p.copy}`);
+      }
+    }
+  }
+
   for (const [ref, used] of sheetsPerStock) {
     if (used > (stockByRef.get(ref)?.quantity ?? 0)) errors.push(`Stock ${ref}: ${used} sheets used, fewer available`);
   }

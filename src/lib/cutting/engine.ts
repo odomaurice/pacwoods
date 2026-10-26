@@ -20,7 +20,7 @@ import type {
   UnplacedReason,
 } from "./types";
 
-export const ENGINE_VERSION = "guillotine-1";
+export const ENGINE_VERSION = "guillotine-2";
 
 type Item = {
   partRef: string;
@@ -105,19 +105,35 @@ function place(sheet: OpenSheet, item: Item, spot: NonNullable<ReturnType<typeof
   const horizontalFirst =
     split === "shorterLeftover" ? r.w - pw < r.h - ph : r.w - pw >= r.h - ph;
 
-  const cut = (x1: number, y1: number, x2: number, y2: number) =>
-    sheet.cuts.push({ x1, y1, x2, y2, order: 0 });
+  // A straight cut across `source` at `at` from its top/left edge. The pieces
+  // either side exclude the kerf; a side narrower than the kerf is sawdust.
+  const cutY = (source: Rect, at: number) => {
+    const below = source.h - at - kerf;
+    sheet.cuts.push({
+      x1: source.x, y1: source.y + at, x2: source.x + source.w, y2: source.y + at,
+      order: 0, axis: "y", at, source,
+      pieces: [{ x: source.x, y: source.y, w: source.w, h: at }, below > 0 ? { x: source.x, y: source.y + at + kerf, w: source.w, h: below } : null],
+    });
+  };
+  const cutX = (source: Rect, at: number) => {
+    const right = source.w - at - kerf;
+    sheet.cuts.push({
+      x1: source.x + at, y1: source.y, x2: source.x + at, y2: source.y + source.h,
+      order: 0, axis: "x", at, source,
+      pieces: [{ x: source.x, y: source.y, w: at, h: source.h }, right > 0 ? { x: source.x + at + kerf, y: source.y, w: right, h: source.h } : null],
+    });
+  };
 
   if (horizontalFirst) {
     // Full-width cut under the part's row, then separate the part from the right.
-    if (r.h - ph > 0) cut(r.x, r.y + ph, r.x + r.w, r.y + ph);
-    if (r.w - pw > 0) cut(r.x + pw, r.y, r.x + pw, r.y + ph);
+    if (r.h - ph > 0) cutY(r, ph);
+    if (r.w - pw > 0) cutX({ x: r.x, y: r.y, w: r.w, h: ph }, pw);
     if (restW > 0) sheet.free.push({ x: r.x + pw + kerf, y: r.y, w: restW, h: ph });
     if (restH > 0) sheet.free.push({ x: r.x, y: r.y + ph + kerf, w: r.w, h: restH });
   } else {
     // Full-height cut beside the part's column, then separate it from below.
-    if (r.w - pw > 0) cut(r.x + pw, r.y, r.x + pw, r.y + r.h);
-    if (r.h - ph > 0) cut(r.x, r.y + ph, r.x + pw, r.y + ph);
+    if (r.w - pw > 0) cutX(r, pw);
+    if (r.h - ph > 0) cutY({ x: r.x, y: r.y, w: pw, h: r.h }, ph);
     if (restW > 0) sheet.free.push({ x: r.x + pw + kerf, y: r.y, w: restW, h: r.h });
     if (restH > 0) sheet.free.push({ x: r.x, y: r.y + ph + kerf, w: pw, h: restH });
   }
@@ -287,6 +303,7 @@ function buildPlan(result: ReturnType<typeof runStrategy>, strategy: string, par
       sheetLowerBound: largest ? Math.ceil(requestedArea / largest) : 0,
       edgingLengthMm: edgingLength(parts),
       cutCount: sheets.reduce((a, s) => a + s.cuts.length, 0),
+      cutLength: sheets.reduce((a, s) => a + s.cuts.reduce((b, c) => b + Math.abs(c.x2 - c.x1) + Math.abs(c.y2 - c.y1), 0), 0),
     },
   };
 }
