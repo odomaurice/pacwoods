@@ -22,6 +22,14 @@ const jobSchema = new Schema(
     /** Opaque value printed in the QR code; reveals nothing about the job. */
     qrToken: { type: String, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    /** Set when staff confirm the boards are in the workshop. */
+    materialConfirmedAt: { type: Date },
+    materialConfirmedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    /**
+     * Position in the cutting queue: a server-issued, ever-increasing number
+     * assigned the first time the job enters the queue, and kept afterwards.
+     */
+    cuttingQueueSeq: { type: Number },
   },
   { timestamps: true },
 );
@@ -30,6 +38,7 @@ jobSchema.index({ workNumber: 1 }, { unique: true });
 jobSchema.index({ qrToken: 1 }, { unique: true });
 jobSchema.index({ clientId: 1, createdAt: -1 });
 jobSchema.index({ status: 1, createdAt: -1 });
+jobSchema.index({ cuttingQueueSeq: 1 }, { unique: true, partialFilterExpression: { cuttingQueueSeq: { $type: "number" } } });
 
 export type JobDoc = InferSchemaType<typeof jobSchema>;
 

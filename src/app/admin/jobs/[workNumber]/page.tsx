@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/CutlistActions";
 import Detail from "@/components/Detail";
+import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,7 +27,11 @@ const EVENT_LABELS: Record<string, string> = {
   PLAN_GENERATED: "Cutting plan generated",
   CUTLIST_APPROVED: "Cutlist approved",
   CUTLIST_REOPENED: "Cutlist reopened for changes",
+  MATERIAL_CONFIRMED: "Materials confirmed available",
+  MATERIAL_WITHDRAWN: "Materials confirmation withdrawn",
 };
+
+const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
 
 export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNumber]">) {
   await requireRole("SUPER_ADMIN", "ADMIN");
@@ -38,7 +43,8 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
   const { current, draft, approved } = cutlists;
 
   const events = await JobStatusEvent.find({ jobId: job._id }).sort({ at: -1 }).lean();
-  const actors = await User.find({ _id: { $in: events.map((e) => e.actorId).filter(Boolean) } }).select("name").lean();
+  const actorIds = [...events.map((e) => e.actorId), job.materialConfirmedBy].filter(Boolean);
+  const actors = await User.find({ _id: { $in: actorIds } }).select("name").lean();
   const actorName = new Map(actors.map((a) => [a._id.toString(), a.name]));
 
   const plan = current?.plan;
@@ -85,7 +91,37 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
         </Detail>
         <Detail label="Created">{dateFormat.format(job.createdAt)}</Detail>
         <Detail label="Last updated">{dateFormat.format(job.updatedAt)}</Detail>
+        <Detail label="Materials">
+          {job.materialConfirmedAt
+            ? `Available · confirmed ${dateFormat.format(job.materialConfirmedAt)}${job.materialConfirmedBy ? ` by ${actorName.get(job.materialConfirmedBy.toString()) ?? "staff"}` : ""}`
+            : "Not yet confirmed"}
+        </Detail>
+        {job.status === "QUEUED_FOR_CUTTING" && job.cuttingQueueSeq != null && (
+          <Detail label="Cutting queue">Ticket #{job.cuttingQueueSeq}</Detail>
+        )}
       </dl>
+
+      {BEFORE_PRODUCTION.includes(job.status) && (
+        <section className="mb-8 flex flex-wrap items-center gap-3 rounded-lg bg-card p-5">
+          <div className="mr-auto">
+            <h2 className="font-semibold">Materials</h2>
+            <p className="text-sm text-muted-foreground">
+              {job.materialConfirmedAt
+                ? job.status === "QUEUED_FOR_CUTTING"
+                  ? "The boards are in the workshop and the job is waiting in the cutting queue."
+                  : "The boards are in the workshop. The job joins the cutting queue when its cutlist is approved."
+                : job.status === "AWAITING_MATERIAL"
+                  ? "The cutlist is approved. Confirm the boards are in the workshop to send the job to the cutting queue."
+                  : "Confirm when the boards for this job are in the workshop."}
+            </p>
+          </div>
+          {job.materialConfirmedAt ? (
+            <MaterialsNotAvailableButton workNumber={job.workNumber} queued={job.status === "QUEUED_FOR_CUTTING"} />
+          ) : (
+            <MaterialsAvailableButton workNumber={job.workNumber} approved={job.status === "AWAITING_MATERIAL"} />
+          )}
+        </section>
+      )}
 
       <section className="mb-8 rounded-lg bg-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -108,7 +144,7 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
               </Link>
             )}
             {canApprove && <ApproveCutlistButton workNumber={job.workNumber} />}
-            {job.status === "AWAITING_MATERIAL" && <ReopenCutlistButton workNumber={job.workNumber} />}
+            {(job.status === "AWAITING_MATERIAL" || job.status === "QUEUED_FOR_CUTTING") && <ReopenCutlistButton workNumber={job.workNumber} />}
           </div>
         </div>
         {plan && (

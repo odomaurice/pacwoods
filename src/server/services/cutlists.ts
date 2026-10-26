@@ -10,7 +10,7 @@ import { Job } from "@/server/db/models/Job";
 import { Material } from "@/server/db/models/Material";
 import { audit } from "@/server/services/audit";
 import { ServiceError, type Actor } from "@/server/services/users";
-import { recordJobEvent, transitionJob } from "@/server/workflow/transitions";
+import { queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
 function assertStaff(actor: Actor) {
   if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") {
@@ -132,8 +132,9 @@ export async function generatePlan(actor: Actor, workNumber: string, raw: unknow
 }
 
 /**
- * Locks the draft as the approved cutlist and moves the job on to waiting for
- * material. Requires a current plan that places every panel.
+ * Locks the draft as the approved cutlist. The job moves on to waiting for
+ * material, or straight into the cutting queue if materials are confirmed.
+ * Requires a current plan that places every panel.
  */
 export async function approveCutlist(actor: Actor, workNumber: string) {
   assertStaff(actor);
@@ -152,11 +153,10 @@ export async function approveCutlist(actor: Actor, workNumber: string) {
       { session },
     );
     if (locked.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The cutlist changed while approving. Reload and try again.");
-    await transitionJob(job._id, "DRAFT", "AWAITING_MATERIAL", {
-      type: "CUTLIST_APPROVED",
-      actorId: actor.id,
-      note: `Cutlist version ${draft.version} approved`,
-    }, session);
+    const event = { type: "CUTLIST_APPROVED", actorId: actor.id, note: `Cutlist version ${draft.version} approved` };
+    // Materials already confirmed: straight into the cutting queue.
+    if (job.materialConfirmedAt) await queueForCutting(job, "DRAFT", event, session);
+    else await transitionJob(job._id, "DRAFT", "AWAITING_MATERIAL", event, session);
   });
   await audit({ actorId: actor.id, action: "cutlist.approved", targetType: "Job", targetId: job._id, meta: { version: draft.version } });
 }
@@ -170,9 +170,10 @@ export async function reopenCutlist(actor: Actor, workNumber: string, reason: st
   const why = reason.trim();
   if (why.length < 3) throw new ServiceError("INVALID", "Give a reason for the change.");
   const job = await loadJob(workNumber);
-  if (job.status !== "AWAITING_MATERIAL") {
+  if (job.status !== "AWAITING_MATERIAL" && job.status !== "QUEUED_FOR_CUTTING") {
     throw new ServiceError("CONFLICT", "Only approved jobs that have not started production can be reopened.");
   }
+  const from = job.status;
   const approved = await CutlistVersion.findOne({ jobId: job._id, state: "APPROVED" }).lean();
   if (!approved) throw new ServiceError("CONFLICT", "There is no approved cutlist to revise.");
 
@@ -195,7 +196,7 @@ export async function reopenCutlist(actor: Actor, workNumber: string, reason: st
       ],
       { session },
     );
-    await transitionJob(job._id, "AWAITING_MATERIAL", "DRAFT", {
+    await transitionJob(job._id, from, "DRAFT", {
       type: "CUTLIST_REOPENED",
       actorId: actor.id,
       reason: why.slice(0, 500),

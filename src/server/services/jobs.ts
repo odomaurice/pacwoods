@@ -10,7 +10,7 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
-import { recordJobEvent } from "@/server/workflow/transitions";
+import { queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
 function assertStaff(actor: Actor) {
@@ -46,11 +46,15 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
           internalNotes: data.internalNotes || undefined,
           qrToken: randomBytes(16).toString("base64url"),
           createdBy: actor.id,
+          ...(data.materialsAvailable ? { materialConfirmedAt: new Date(), materialConfirmedBy: actor.id } : {}),
         },
       ],
       { session },
     );
     await recordJobEvent(created._id, { type: "JOB_CREATED", actorId: actor.id, note: "Order registered" }, session);
+    if (data.materialsAvailable) {
+      await recordJobEvent(created._id, { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" }, session);
+    }
     return created;
   });
 
@@ -151,4 +155,58 @@ export async function getJobByWorkNumber(workNumber: string) {
   const profile = await ClientProfile.findById(job.clientId).lean();
   const user = profile && (await User.findById(profile.userId).select("name phone email").lean());
   return { job, profile, clientUser: user };
+}
+
+/**
+ * Staff confirm the boards for a job are in the workshop. An approved job
+ * joins the cutting queue at once; a draft simply records it, and goes
+ * straight to the queue when its cutlist is approved.
+ */
+export async function confirmMaterials(actor: Actor, workNumber: string) {
+  assertStaff(actor);
+  await connectDb();
+  const job = await Job.findOne({ workNumber });
+  if (!job) throw new ServiceError("NOT_FOUND", "Job not found.");
+  if (job.materialConfirmedAt) throw new ServiceError("CONFLICT", "Materials are already confirmed for this job.");
+  const set = { materialConfirmedAt: new Date(), materialConfirmedBy: new mongoose.Types.ObjectId(actor.id) };
+  const event = { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" };
+
+  await mongoose.connection.transaction(async (session) => {
+    if (job.status === "AWAITING_MATERIAL") {
+      await queueForCutting(job, "AWAITING_MATERIAL", event, session, set);
+    } else if (job.status === "DRAFT") {
+      const r = await Job.updateOne({ _id: job._id, status: "DRAFT", materialConfirmedAt: null }, { $set: set }, { session });
+      if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The job changed while you were working. Reload and try again.");
+      await recordJobEvent(job._id, event, session);
+    } else {
+      throw new ServiceError("CONFLICT", "Materials can only be confirmed before production starts.");
+    }
+  });
+  await audit({ actorId: actor.id, action: "job.material_confirmed", targetType: "Job", targetId: job._id });
+}
+
+/** Undo a confirmation made in error. A queued job leaves the queue (keeping its place for later). */
+export async function withdrawMaterials(actor: Actor, workNumber: string, reason: string) {
+  assertStaff(actor);
+  const why = reason.trim();
+  if (why.length < 3) throw new ServiceError("INVALID", "Give a reason.");
+  await connectDb();
+  const job = await Job.findOne({ workNumber });
+  if (!job) throw new ServiceError("NOT_FOUND", "Job not found.");
+  if (!job.materialConfirmedAt) throw new ServiceError("CONFLICT", "Materials are not confirmed for this job.");
+  const set = { materialConfirmedAt: null, materialConfirmedBy: null };
+  const event = { type: "MATERIAL_WITHDRAWN", actorId: actor.id, reason: why.slice(0, 500) };
+
+  await mongoose.connection.transaction(async (session) => {
+    if (job.status === "QUEUED_FOR_CUTTING") {
+      await transitionJob(job._id, "QUEUED_FOR_CUTTING", "AWAITING_MATERIAL", event, session, set);
+    } else if (job.status === "DRAFT") {
+      const r = await Job.updateOne({ _id: job._id, status: "DRAFT" }, { $set: set }, { session });
+      if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The job changed while you were working. Reload and try again.");
+      await recordJobEvent(job._id, event, session);
+    } else {
+      throw new ServiceError("CONFLICT", "Materials can only be withdrawn before production starts.");
+    }
+  });
+  await audit({ actorId: actor.id, action: "job.material_withdrawn", targetType: "Job", targetId: job._id, meta: { reason: why } });
 }

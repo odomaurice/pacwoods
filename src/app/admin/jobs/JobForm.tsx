@@ -39,7 +39,7 @@ export default function JobForm({
     resolver: zodResolver(jobSchema),
     defaultValues: existing
       ? existing.values
-      : { clientId: defaultClientId ?? "", cutting: true, edging: false, title: "", clientNotes: "", internalNotes: "" },
+      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "" },
   });
 
   const onSubmit = handleSubmit((values) => {
@@ -93,6 +93,18 @@ export default function JobForm({
         </label>
         {errors.cutting && <p className="text-sm text-destructive">{errors.cutting.message}</p>}
       </fieldset>
+
+      {!editing && (
+        <label className="flex min-h-11 items-start gap-3 rounded-lg bg-accent p-3 text-sm">
+          <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("materialsAvailable")} />
+          <span>
+            <span className="block font-medium">Materials available</span>
+            <span className="block text-muted-foreground">
+              The boards for this job are already in the workshop. Once the cutlist is approved, the job goes straight into the cutting queue.
+            </span>
+          </span>
+        </label>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="clientNotes">Notes for the client (they can see these)</Label>
