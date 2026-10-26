@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import { JOB_STATUSES } from "@/lib/jobs";
 
 /**
@@ -43,4 +44,4 @@ jobSchema.index({ cuttingQueueSeq: 1 }, { unique: true, partialFilterExpression:
 export type JobDoc = InferSchemaType<typeof jobSchema>;
 
 export const Job: Model<JobDoc> =
-  (mongoose.models.Job as Model<JobDoc>) ?? mongoose.model("Job", jobSchema);
+  defineModel<JobDoc>("Job", jobSchema);

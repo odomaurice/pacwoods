@@ -88,6 +88,9 @@ export const jobSchema = jobDetailsSchema.and(
     clientId: z.string().min(1, "Choose a client."),
     /** Ticked when the boards for this job are already in the workshop. */
     materialsAvailable: z.boolean().optional(),
+    /** Optional: assign operators straight away. */
+    cuttingOperatorId: z.string().optional(),
+    edgingOperatorId: z.string().optional(),
   }),
 );
 export type JobInput = z.infer<typeof jobSchema>;

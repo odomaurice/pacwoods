@@ -45,7 +45,12 @@ export function eligibility(tasks: QueueItem[]): Map<string, Eligibility> {
     }
   }
   for (const t of tasks) {
-    if (t.status === "BLOCKED") result.set(t.id, { canStart: false, reason: "Waiting for cutting to finish." });
+    if (t.status === "BLOCKED") {
+      result.set(t.id, {
+        canStart: false,
+        reason: t.stage === "EDGING" ? "Waiting for cutting to finish." : "Not in the cutting queue yet: waiting for the cutlist to be approved and materials confirmed.",
+      });
+    }
     if (t.status === "IN_PROGRESS") result.set(t.id, { canStart: false, reason: "In progress." });
   }
   return result;

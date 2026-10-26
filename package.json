@@ -12,7 +12,8 @@
     "db:ping": "tsx --conditions=react-server --env-file=.env.local scripts/db-ping.ts",
     "db:indexes": "tsx --conditions=react-server --env-file=.env.local scripts/sync-indexes.ts",
     "create-super-admin": "tsx --conditions=react-server --env-file=.env.local scripts/create-super-admin.ts",
-    "materials:standard": "tsx --conditions=react-server --env-file=.env.local scripts/add-standard-materials.ts"
+    "materials:standard": "tsx --conditions=react-server --env-file=.env.local scripts/add-standard-materials.ts",
+    "repair:production": "tsx --conditions=react-server --env-file=.env.local scripts/repair-production.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

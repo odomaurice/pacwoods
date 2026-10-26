@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import { GRAINS } from "@/lib/schemas";
 
 /** A sheet material in the catalogue. Dimensions are millimetres. */
@@ -24,4 +25,4 @@ materialSchema.index({ active: 1, category: 1 });
 export type MaterialDoc = InferSchemaType<typeof materialSchema>;
 
 export const Material: Model<MaterialDoc> =
-  (mongoose.models.Material as Model<MaterialDoc>) ?? mongoose.model("Material", materialSchema);
+  defineModel<MaterialDoc>("Material", materialSchema);

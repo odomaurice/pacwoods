@@ -64,6 +64,14 @@ business owner. Leave a marked gap and ask.
   lives in `docs/brand/`.
 - Keep large binaries (video, raw photos) out of git.
 
+## Database models
+
+- Define every Mongoose model with `defineModel` (`src/server/db/model.ts`),
+  never `mongoose.models.X ?? mongoose.model(...)`. Under `next dev` a cached
+  model keeps its old schema and silently drops new fields on save.
+- After adding fields that existing data needs, write an idempotent repair
+  script with a dry run (see `scripts/repair-production.ts`).
+
 ## React
 
 - No `setState` in an effect body; the lint rule is an error. Use

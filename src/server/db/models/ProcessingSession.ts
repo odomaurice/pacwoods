@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 
 export const SESSION_END_REASONS = ["PAUSE", "COMPLETE", "REASSIGN"] as const;
 
@@ -25,5 +26,4 @@ processingSessionSchema.index({ operatorId: 1, startedAt: -1 });
 export type ProcessingSessionDoc = InferSchemaType<typeof processingSessionSchema>;
 
 export const ProcessingSession: Model<ProcessingSessionDoc> =
-  (mongoose.models.ProcessingSession as Model<ProcessingSessionDoc>) ??
-  mongoose.model("ProcessingSession", processingSessionSchema);
+  defineModel<ProcessingSessionDoc>("ProcessingSession", processingSessionSchema);

@@ -5,7 +5,7 @@ import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { approveCutlist, generatePlan } from "@/server/services/cutlists";
-import { createJob } from "@/server/services/jobs";
+import { confirmMaterials, createJob, updateDraftJob } from "@/server/services/jobs";
 import { assignOperator, completeTask, pauseTask, startTask } from "@/server/services/production";
 import { bootstrapSuperAdmin, provisionAccount, provisionClient, setUserStatus, type Actor } from "@/server/services/users";
 import { connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
@@ -149,6 +149,46 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
     expect(s.map((x) => x.endReason)).toEqual(["REASSIGN"]);
     await startTask(second, cutId);
     await completeTask(second, cutId, done);
+  });
+
+  it("creates production stages with the job, with operators chosen on the form", async () => {
+    const job = await createJob(root, { clientId, cutting: true, edging: true, cuttingOperatorId: cutter.id, edgingOperatorId: allRounder.id });
+    const tasks = await ProductionTask.find({ jobId: job._id }).lean();
+    expect(tasks.map((t) => [t.stage, t.status, t.assignedOperatorId?.toString()]).sort()).toEqual([
+      ["CUTTING", "BLOCKED", cutter.id],
+      ["EDGING", "BLOCKED", allRounder.id],
+    ]);
+    // A cutter cannot be put on edging.
+    await expect(createJob(root, { clientId, cutting: true, edging: true, edgingOperatorId: cutter.id })).rejects.toMatchObject({ code: "INVALID" });
+  });
+
+  it("keeps the edging stage in step with a draft's edging choice", async () => {
+    const job = await createJob(root, { clientId, cutting: true, edging: false });
+    expect(await ProductionTask.countDocuments({ jobId: job._id, stage: "EDGING" })).toBe(0);
+    await updateDraftJob(root, job.workNumber, { cutting: true, edging: true });
+    expect(await ProductionTask.countDocuments({ jobId: job._id, stage: "EDGING" })).toBe(1);
+    await updateDraftJob(root, job.workNumber, { cutting: true, edging: false });
+    expect(await ProductionTask.countDocuments({ jobId: job._id, stage: "EDGING" })).toBe(0);
+  });
+
+  it("assigned work that is not queued yet cannot be started", async () => {
+    const op = { id: (await provisionAccount(root, { role: "OPERATOR", name: "Early", phone: "+2348060000016", capabilities: ["CUTTING"] })).user._id.toString(), role: "OPERATOR" as const };
+    const job = await createJob(root, { clientId, cutting: true, edging: false, cuttingOperatorId: op.id });
+    const task = await ProductionTask.findOne({ jobId: job._id, stage: "CUTTING" }).lean();
+    await expect(startTask(op, task!._id.toString())).rejects.toMatchObject({ code: "CONFLICT" });
+    // Once approved with materials, the same task (and assignment) is queued.
+    await confirmMaterials(root, job.workNumber);
+    await generatePlan(root, job.workNumber, {
+      parts: [{ ref: "P1", length: 600, width: 400, quantity: 2, grain: "NONE", edges: NO_EDGES }],
+      stockSheets: [{ ref: "S1", length: 2440, width: 1220, quantity: 2, grained: false }],
+      options: DEFAULT_OPTIONS,
+    });
+    await approveCutlist(root, job.workNumber);
+    const queued = await ProductionTask.findById(task!._id).lean();
+    expect(queued?.status).toBe("QUEUED");
+    expect(queued?.assignedOperatorId?.toString()).toBe(op.id);
+    await startTask(op, task!._id.toString());
+    await completeTask(op, task!._id.toString(), done);
   });
 
   it("cannot complete work that is not in progress", async () => {

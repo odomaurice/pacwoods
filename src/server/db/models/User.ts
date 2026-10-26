@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import { CAPABILITIES, PERMISSIONS, ROLES } from "@/lib/roles";
 import { USER_STATUSES } from "@/lib/schemas";
 
@@ -46,4 +47,4 @@ userSchema.pre("validate", function () {
 export type UserDoc = InferSchemaType<typeof userSchema>;
 
 export const User: Model<UserDoc> =
-  (mongoose.models.User as Model<UserDoc>) ?? mongoose.model("User", userSchema);
+  defineModel<UserDoc>("User", userSchema);

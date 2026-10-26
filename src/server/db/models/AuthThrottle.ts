@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 
 /** Fixed-window attempt counters; MongoDB's TTL monitor deletes old windows. */
 const authThrottleSchema = new Schema(
@@ -16,5 +17,4 @@ authThrottleSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 export type AuthThrottleDoc = InferSchemaType<typeof authThrottleSchema>;
 
 export const AuthThrottle: Model<AuthThrottleDoc> =
-  (mongoose.models.AuthThrottle as Model<AuthThrottleDoc>) ??
-  mongoose.model("AuthThrottle", authThrottleSchema);
+  defineModel<AuthThrottleDoc>("AuthThrottle", authThrottleSchema);

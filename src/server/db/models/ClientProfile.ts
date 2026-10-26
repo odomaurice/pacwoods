@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 
 const clientProfileSchema = new Schema(
   {
@@ -18,5 +19,4 @@ clientProfileSchema.index({ userId: 1 }, { unique: true });
 export type ClientProfileDoc = InferSchemaType<typeof clientProfileSchema>;
 
 export const ClientProfile: Model<ClientProfileDoc> =
-  (mongoose.models.ClientProfile as Model<ClientProfileDoc>) ??
-  mongoose.model("ClientProfile", clientProfileSchema);
+  defineModel<ClientProfileDoc>("ClientProfile", clientProfileSchema);

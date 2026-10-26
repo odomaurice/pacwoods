@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Detail from "@/components/Detail";
 import AssignOperator from "@/components/production/AssignOperator";
 import { TaskStatusBadge } from "@/components/StatusBadge";
@@ -10,25 +11,31 @@ import type { Types } from "mongoose";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
-/** The job page's production section: each stage, who has it, and how far it got. */
+/**
+ * The job page's production section: each stage, the operator assigned to it
+ * (with their contact details), and how far the work has got.
+ */
 export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }) {
   await connectDb();
   const tasks = await tasksForJob(jobId);
-  if (tasks.length === 0) return null;
   const [cutters, edgers] = await Promise.all([listOperatorsFor("CUTTING"), listOperatorsFor("EDGING")]);
-  const names = new Map(
-    (await User.find({ _id: { $in: tasks.flatMap(({ task }) => [task.assignedOperatorId, task.completedBy]).filter(Boolean) } }).select("name").lean()).map((u) => [
-      u._id.toString(),
-      u.name,
-    ]),
-  );
+  const people = await User.find({ _id: { $in: tasks.flatMap(({ task }) => [task.assignedOperatorId, task.completedBy]).filter(Boolean) } })
+    .select("name phone email capabilities status")
+    .lean();
+  const byId = new Map(people.map((u) => [u._id.toString(), u]));
 
   return (
-    <section className="mb-8 space-y-4">
-      <h2 className="text-lg font-semibold">Production</h2>
+    <section aria-labelledby="production" className="mb-8 space-y-4">
+      <h2 id="production" className="text-lg font-semibold">
+        Production and operators
+      </h2>
+      {tasks.length === 0 && (
+        <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">This job has no production stages.</p>
+      )}
       {tasks.map(({ task, sessions }) => {
         const pool = (task.stage === "CUTTING" ? cutters : edgers).map((o) => ({ id: o._id.toString(), name: o.name }));
         const open = task.status !== "COMPLETED" && task.status !== "CANCELLED";
+        const op = task.assignedOperatorId ? byId.get(task.assignedOperatorId.toString()) : undefined;
         return (
           <div key={task._id.toString()} className="space-y-4 rounded-lg bg-card p-5">
             <div className="flex flex-wrap items-center gap-3">
@@ -39,15 +46,46 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
                 <ViewButton href={`/admin/tasks/${task._id}`} label={`View ${STAGE_LABELS[task.stage].toLowerCase()}`} />
               </span>
             </div>
-            <dl className="grid gap-4 sm:grid-cols-4">
-              <Detail label="Operator">
-                {task.assignedOperatorId ? (names.get(task.assignedOperatorId.toString()) ?? "—") : <span className="text-destructive">Needs assignment</span>}
-              </Detail>
-              <Detail label="Started">{task.firstStartedAt ? dateFormat.format(task.firstStartedAt) : "—"}</Detail>
-              <Detail label="Completed">{task.completedAt ? dateFormat.format(task.completedAt) : "—"}</Detail>
-              <Detail label="Time worked">{sessions.length ? formatDuration(activeMs(sessions)) : "—"}</Detail>
-            </dl>
-            {open && <AssignOperator taskId={task._id.toString()} current={task.assignedOperatorId?.toString()} operators={pool} inProgress={task.status === "IN_PROGRESS"} />}
+
+            <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
+              <div className="rounded-md bg-muted/60 p-4 text-sm">
+                <p className="mb-1 text-muted-foreground">Assigned operator</p>
+                {op ? (
+                  <div className="space-y-0.5">
+                    <p className="font-semibold">{op.name}</p>
+                    {op.phone && (
+                      <p>
+                        <a href={`tel:${op.phone}`} className="underline-offset-4 hover:underline">
+                          {op.phone}
+                        </a>
+                      </p>
+                    )}
+                    {op.email && <p className="break-all">{op.email}</p>}
+                    <p className="text-muted-foreground">
+                      Skills: {op.capabilities.map((c) => STAGE_LABELS[c as "CUTTING" | "EDGING"]).join(", ")}
+                      {op.status !== "ACTIVE" && <span className="text-destructive"> · account {op.status.toLowerCase()}</span>}
+                    </p>
+                    <Link href={`/admin/accounts/${op._id}`} className="inline-block pt-1 text-sm font-medium underline-offset-4 hover:underline">
+                      View operator →
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="font-medium text-destructive">Not assigned yet</p>
+                )}
+              </div>
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <Detail label="Started">{task.firstStartedAt ? dateFormat.format(task.firstStartedAt) : "—"}</Detail>
+                <Detail label="Completed">{task.completedAt ? dateFormat.format(task.completedAt) : "—"}</Detail>
+                <Detail label="Time worked">{sessions.length ? formatDuration(activeMs(sessions)) : "—"}</Detail>
+              </dl>
+            </div>
+
+            {open && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">{op ? "Change operator" : "Assign an operator"}</p>
+                <AssignOperator taskId={task._id.toString()} current={task.assignedOperatorId?.toString()} operators={pool} inProgress={task.status === "IN_PROGRESS"} />
+              </div>
+            )}
           </div>
         );
       })}

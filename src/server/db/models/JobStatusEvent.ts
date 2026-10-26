@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import { JOB_STATUSES } from "@/lib/jobs";
 
 /** Append-only job timeline. Written only by the workflow module. */
@@ -23,5 +24,4 @@ jobStatusEventSchema.index({ jobId: 1, at: 1 });
 export type JobStatusEventDoc = InferSchemaType<typeof jobStatusEventSchema>;
 
 export const JobStatusEvent: Model<JobStatusEventDoc> =
-  (mongoose.models.JobStatusEvent as Model<JobStatusEventDoc>) ??
-  mongoose.model("JobStatusEvent", jobStatusEventSchema);
+  defineModel<JobStatusEventDoc>("JobStatusEvent", jobStatusEventSchema);

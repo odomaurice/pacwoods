@@ -1,4 +1,5 @@
-import mongoose, { Schema, type ClientSession, type Model } from "mongoose";
+import { Schema, type ClientSession, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 
 /** Named monotonic sequences (`job:2026`, `client`), bumped atomically. */
 const counterSchema = new Schema(
@@ -10,8 +11,7 @@ const counterSchema = new Schema(
 );
 
 export const Counter: Model<{ _id: string; seq: number }> =
-  (mongoose.models.Counter as Model<{ _id: string; seq: number }>) ??
-  mongoose.model("Counter", counterSchema);
+  defineModel<{ _id: string; seq: number }>("Counter", counterSchema);
 
 /** Returns the next value of `name`, starting at 1. Safe under concurrency. */
 export async function nextSequence(name: string, session?: ClientSession): Promise<number> {

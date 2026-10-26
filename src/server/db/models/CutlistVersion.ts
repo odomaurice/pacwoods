@@ -1,4 +1,5 @@
-import mongoose, { Schema, type Model, type Types } from "mongoose";
+import { Schema, type Model, type Types } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import type { CutlistOptions, CutlistPart, CutlistStock } from "@/lib/cutlist";
 import type { Plan } from "@/lib/cutting/types";
 
@@ -58,5 +59,4 @@ cutlistVersionSchema.index({ jobId: 1, version: 1 }, { unique: true });
 cutlistVersionSchema.index({ jobId: 1 }, { unique: true, partialFilterExpression: { state: "DRAFT" }, name: "one_draft_per_job" });
 
 export const CutlistVersion: Model<CutlistVersionDoc> =
-  (mongoose.models.CutlistVersion as Model<CutlistVersionDoc>) ??
-  mongoose.model<CutlistVersionDoc>("CutlistVersion", cutlistVersionSchema);
+  defineModel<CutlistVersionDoc>("CutlistVersion", cutlistVersionSchema);

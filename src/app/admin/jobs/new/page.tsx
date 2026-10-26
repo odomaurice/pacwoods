@@ -3,6 +3,7 @@ import Link from "next/link";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import { requireRole } from "@/server/auth/guards";
+import { listOperatorsFor } from "@/server/services/production";
 import { listActiveClientOptions } from "@/server/services/users";
 import JobForm from "../JobForm";
 
@@ -11,7 +12,8 @@ export const metadata: Metadata = { title: "New job | Pacwoods" };
 export default async function NewJobPage({ searchParams }: PageProps<"/admin/jobs/new">) {
   await requireRole("SUPER_ADMIN", "ADMIN");
   const { client } = await searchParams;
-  const clients = await listActiveClientOptions();
+  const [clients, cutters, edgers] = await Promise.all([listActiveClientOptions(), listOperatorsFor("CUTTING"), listOperatorsFor("EDGING")]);
+  const asOptions = (ops: typeof cutters) => ops.map((o) => ({ id: o._id.toString(), name: o.name }));
   const defaultClientId = typeof client === "string" && clients.some((c) => c.id === client) ? client : undefined;
 
   return (
@@ -27,7 +29,7 @@ export default async function NewJobPage({ searchParams }: PageProps<"/admin/job
           </Link>
         </EmptyState>
       ) : (
-        <JobForm clients={clients} defaultClientId={defaultClientId} />
+        <JobForm clients={clients} defaultClientId={defaultClientId} cuttingOperators={asOptions(cutters)} edgingOperators={asOptions(edgers)} />
       )}
     </>
   );

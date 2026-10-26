@@ -1,4 +1,5 @@
-import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { Schema, type InferSchemaType, type Model } from "mongoose";
+import { defineModel } from "@/server/db/model";
 import { STAGES, TASK_STATUSES } from "@/lib/production";
 
 /**
@@ -43,4 +44,4 @@ productionTaskSchema.index(
 export type ProductionTaskDoc = InferSchemaType<typeof productionTaskSchema>;
 
 export const ProductionTask: Model<ProductionTaskDoc> =
-  (mongoose.models.ProductionTask as Model<ProductionTaskDoc>) ?? mongoose.model("ProductionTask", productionTaskSchema);
+  defineModel<ProductionTaskDoc>("ProductionTask", productionTaskSchema);

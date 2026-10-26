@@ -61,7 +61,8 @@ export default async function QueuesPage() {
             )}
             {upcoming.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                Waiting for cutting to finish: {upcoming.map((r) => r.task.workNumber).join(", ")}
+                {stage === "EDGING" ? "Waiting for cutting to finish" : "Not in the queue yet (cutlist or materials pending)"}:{" "}
+                {upcoming.map((r) => r.task.workNumber).join(", ")}
               </p>
             )}
           </section>
