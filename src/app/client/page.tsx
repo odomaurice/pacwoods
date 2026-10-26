@@ -5,6 +5,7 @@ import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
+import ViewButton from "@/components/ViewButton";
 import { describeOperations } from "@/lib/jobs";
 import { requireRole } from "@/server/auth/guards";
 import { connectDb } from "@/server/db/connect";
@@ -91,9 +92,12 @@ export default async function ClientJobs() {
                 {describeOperations(job.operations)} · Registered {dateFormat.format(job.createdAt)}
               </p>
               {job.clientNotes && <p className="mt-3 text-sm whitespace-pre-line">{job.clientNotes}</p>}
-              <Link href={`/client/jobs/${job.workNumber}/card`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3" })}>
-                Job card
-              </Link>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <ViewButton href={`/client/jobs/${job.workNumber}`} label={`View ${job.workNumber}`} />
+                <Link href={`/client/jobs/${job.workNumber}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Job card
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

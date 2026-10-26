@@ -6,21 +6,22 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, SunburstChar
 import { JOB_STATUS_LABELS, type JobStatus } from "@/lib/jobs";
 
 /**
- * Validated categorical order (dataviz reference palette, light surface):
- * passes CVD and normal-vision separation. Several slots sit below 3:1 on
- * white, so every chart also carries visible labels and a table view.
+ * Pacwoods chart palette, in fixed order: wood gold, blue, green, rust, plum.
+ * Validated on the white card surface (dataviz validator): CVD and
+ * normal-vision separation pass and every slot clears 3:1 contrast. Charts
+ * still carry labels and a table view so colour is never the only cue.
  */
-const SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"] as const;
+const SERIES = ["#c27a2c", "#2f6db5", "#2f9a68", "#a8473a", "#8a6bb0"] as const;
 const INK = "#1b2328";
 const MUTED = "#5b6670";
 const GRID = "#e5e7e9";
 
 const PHASES: Array<{ name: string; color: string; statuses: JobStatus[] }> = [
-  { name: "Preparation", color: SERIES[0], statuses: ["DRAFT", "AWAITING_APPROVAL", "AWAITING_MATERIAL"] },
-  { name: "Cutting", color: SERIES[1], statuses: ["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS"] },
+  { name: "Preparation", color: SERIES[1], statuses: ["DRAFT", "AWAITING_APPROVAL", "AWAITING_MATERIAL"] },
+  { name: "Cutting", color: SERIES[0], statuses: ["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS"] },
   { name: "Edging", color: SERIES[2], statuses: ["AWAITING_EDGING", "QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS", "AWAITING_QUALITY_CHECK"] },
-  { name: "Finished", color: SERIES[3], statuses: ["COMPLETED"] },
-  { name: "Stopped", color: SERIES[4], statuses: ["ON_HOLD", "CANCELLED"] },
+  { name: "Finished", color: SERIES[4], statuses: ["COMPLETED"] },
+  { name: "Stopped", color: SERIES[3], statuses: ["ON_HOLD", "CANCELLED"] },
 ];
 
 function ChartFrame({ title, description, children, table }: { title: string; description?: string; children: ReactNode; table: ReactNode }) {
@@ -178,7 +179,7 @@ export function WorkloadChart({ data }: { data: Array<{ id: string; name: string
               <Tooltip cursor={{ fill: "#f1f2f3" }} contentStyle={tooltipStyle} />
               <Legend verticalAlign="top" align="left" iconType="square" wrapperStyle={{ fontSize: 13, color: INK, paddingBottom: 8 }} />
               <Bar dataKey="cutting" name="Cutting" stackId="w" fill={SERIES[0]} stroke="#ffffff" strokeWidth={2} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
-              <Bar dataKey="edging" name="Edging" stackId="w" fill={SERIES[1]} stroke="#ffffff" strokeWidth={2} radius={[0, 4, 4, 0]} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
+              <Bar dataKey="edging" name="Edging" stackId="w" fill={SERIES[2]} stroke="#ffffff" strokeWidth={2} radius={[0, 4, 4, 0]} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -205,7 +206,7 @@ export function SheetsByMaterialChart({ data }: { data: Array<{ material: string
               <XAxis type="number" allowDecimals={false} tick={{ fill: MUTED, fontSize: 12 }} tickLine={false} axisLine={false} />
               <YAxis type="category" dataKey="material" width={150} tick={{ fill: INK, fontSize: 12 }} tickLine={false} axisLine={false} />
               <Tooltip cursor={{ fill: "#f1f2f3" }} contentStyle={tooltipStyle} formatter={(v) => [v, "Sheets"]} />
-              <Bar dataKey="sheets" name="Sheets" fill={SERIES[2]} radius={[0, 4, 4, 0]} label={{ position: "right", fill: INK, fontSize: 12 }} maxBarSize={24} />
+              <Bar dataKey="sheets" name="Sheets" fill={SERIES[1]} radius={[0, 4, 4, 0]} label={{ position: "right", fill: INK, fontSize: 12 }} maxBarSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>

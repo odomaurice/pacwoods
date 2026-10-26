@@ -25,12 +25,12 @@ export default async function ScanPage({ params }: PageProps<"/j/[token]">) {
     case "CLIENT": {
       const owns = await ClientProfile.exists({ _id: job.clientId, userId: user.id });
       if (!owns) notFound();
-      redirect(`/client/jobs/${job.workNumber}/card`);
+      redirect(`/client/jobs/${job.workNumber}`);
     }
     case "OPERATOR": {
       // Straight to this job if it is assigned to them; otherwise their queue.
       const task = await ProductionTask.findOne({ jobId: job._id, assignedOperatorId: user.id }).sort({ status: 1 }).select("_id").lean();
-      redirect(task ? `/operator/tasks/${task._id}` : "/operator");
+      redirect(task ? `/operator/tasks/${task._id}` : "/operator/queue");
     }
   }
 }

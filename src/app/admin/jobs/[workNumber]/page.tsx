@@ -10,6 +10,7 @@ import JobProduction from "@/components/production/JobProduction";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import { describeOperations, JOB_STATUS_LABELS } from "@/lib/jobs";
+import { EVENT_LABELS } from "@/lib/events";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
 import { percent } from "@/lib/plan-text";
 import { requireRole } from "@/server/auth/guards";
@@ -25,26 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/admin/jobs/[workN
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
-const EVENT_LABELS: Record<string, string> = {
-  JOB_CREATED: "Job registered",
-  PLAN_GENERATED: "Cutting plan generated",
-  CUTLIST_APPROVED: "Cutlist approved",
-  CUTLIST_REOPENED: "Cutlist reopened for changes",
-  MATERIAL_CONFIRMED: "Materials confirmed available",
-  MATERIAL_WITHDRAWN: "Materials confirmation withdrawn",
-  OPERATOR_ASSIGNED: "Operator assigned",
-  CUTTING_STARTED: "Cutting started",
-  CUTTING_PAUSED: "Cutting paused",
-  CUTTING_RESUMED: "Cutting resumed",
-  CUTTING_COMPLETED: "Cutting completed",
-  EDGING_STARTED: "Edging started",
-  EDGING_PAUSED: "Edging paused",
-  EDGING_RESUMED: "Edging resumed",
-  EDGING_COMPLETED: "Edging completed",
-  JOB_COMPLETED: "Job completed",
-  ISSUE_REPORTED: "Issue reported",
-  ISSUE_RESOLVED: "Issue resolved",
-};
+
 
 const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
 

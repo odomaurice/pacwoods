@@ -1,102 +1,131 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DailyBarChart } from "@/components/dashboard/Charts";
-import StatTile from "@/components/dashboard/StatTile";
+import { CommandHeader } from "@/components/dashboard/CommandCentre";
 import EmptyState from "@/components/EmptyState";
-import PageHeader from "@/components/PageHeader";
+import IssueList from "@/components/issues/IssueList";
 import JobSummaryCard from "@/components/production/JobSummaryCard";
 import TaskActions from "@/components/production/TaskActions";
-import { TaskStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import ViewButton from "@/components/ViewButton";
-import { STAGES, STAGE_LABELS } from "@/lib/production";
+import { STAGE_LABELS, formatDuration } from "@/lib/production";
 import { requireRole } from "@/server/auth/guards";
-import { operatorDashboard } from "@/server/services/dashboard";
+import { operatorDashboard, operatorIssues } from "@/server/services/dashboard";
 import { getJobCardData, scanUrl } from "@/server/services/jobCards";
-import { operatorQueue } from "@/server/services/production";
+import { operatorHistory, operatorQueue } from "@/server/services/production";
 
-export const metadata: Metadata = { title: "My queue | Pacwoods" };
+export const metadata: Metadata = { title: "Overview | Pacwoods" };
 
-export default async function OperatorQueue() {
+const when = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+/** The operator's home: what they are on, what is next, and how their week went. */
+export default async function OperatorOverview() {
   const user = await requireRole("OPERATOR");
-  const [rows, stats] = await Promise.all([operatorQueue(user.id), operatorDashboard(user.id)]);
-  const cards = await Promise.all(
-    rows.map(async (r) => {
-      const found = await getJobCardData(r.task.workNumber);
-      return { ...r, card: found ? { data: found.data, url: await scanUrl(found.qrToken) } : null };
-    }),
-  );
+  const [queue, stats, history, issues] = await Promise.all([operatorQueue(user.id), operatorDashboard(user.id), operatorHistory(user.id), operatorIssues(user.id)]);
+
+  const active = queue.find((q) => q.task.status === "IN_PROGRESS");
+  const next = active ? undefined : queue.find((q) => q.rule.canStart);
+  const focus = active ?? next;
+  const card = focus ? await getJobCardData(focus.task.workNumber) : null;
+  const openIssues = issues.filter((i) => i.status === "OPEN").length;
 
   return (
-    <div className="space-y-8">
-      <PageHeader title="My queue" description="Your assigned jobs, in order. Only the next job in each queue can be started." />
+    <div className="space-y-6">
+      <CommandHeader
+        name={user.name}
+        figures={[
+          { label: "In my queue", value: stats.waiting, href: "/operator/queue" },
+          { label: "Completed this week", value: stats.completedThisWeek, href: "/operator/history" },
+          { label: "Hours worked this week", value: stats.hoursThisWeek, href: "/operator/history" },
+          { label: "My open reports", value: openIssues, href: "/operator", alert: true },
+        ]}
+        actions={
+          <Link href="/operator/queue" className={buttonVariants({ className: "bg-brand-gold text-brand-charcoal hover:bg-brand-gold/90" })}>
+            Open my queue
+          </Link>
+        }
+      />
 
-      <div className="grid grid-cols-3 gap-3">
-        <StatTile label="In my queue" value={stats.waiting} href="/operator" />
-        <StatTile label="Completed this week" value={stats.completedThisWeek} href="/operator/history" hint="History" />
-        <StatTile label="Hours worked this week" value={stats.hoursThisWeek} href="/operator/history" hint="History" />
+      <section aria-labelledby="focus" className="space-y-3">
+        <h2 id="focus" className="text-lg font-semibold">
+          {active ? "Working now" : "Next up"}
+        </h2>
+        {focus && card ? (
+          <JobSummaryCard
+            data={card.data}
+            scanUrl={await scanUrl(card.qrToken)}
+            header={<p className="text-xs font-semibold tracking-[0.2em] text-brand-gold uppercase">{STAGE_LABELS[focus.task.stage]}</p>}
+          >
+            <div className="space-y-3">
+              {!active && (
+                <TaskActions
+                  taskId={focus.task._id.toString()}
+                  workNumber={focus.task.workNumber}
+                  stage={focus.task.stage}
+                  status={focus.task.status}
+                  canStart={focus.rule.canStart}
+                  reason={focus.rule.reason}
+                  totalPanels={0}
+                  startOnly
+                />
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/operator/tasks/${focus.task._id}`} className={buttonVariants({ size: active ? "lg" : "sm", className: active ? "h-12 px-6 text-base" : undefined })}>
+                  {active ? "Continue: pause or complete" : "View job"}
+                </Link>
+                <Link href={`/operator/tasks/${focus.task._id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Print job card
+                </Link>
+              </div>
+            </div>
+          </JobSummaryCard>
+        ) : (
+          <EmptyState title={queue.length ? "Nothing can be started right now." : "No work is assigned to you."}>
+            {queue.length > 0 && "Your assigned jobs are waiting for cutting, materials or approval. See My queue for details."}
+          </EmptyState>
+        )}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DailyBarChart data={stats.completedPerDay} title="Work I completed" unit="Stages completed" />
+
+        <section aria-labelledby="recent" className="rounded-lg bg-card p-5">
+          <div className="mb-3 flex items-center">
+            <h2 id="recent" className="font-semibold">
+              Recently completed
+            </h2>
+            <Link href="/operator/history" className="ml-auto text-sm text-muted-foreground hover:text-foreground hover:underline">
+              All history
+            </Link>
+          </div>
+          {history.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing completed yet.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {history.slice(0, 5).map(({ task, activeMs }) => (
+                <li key={task._id.toString()} className="flex items-center gap-3 py-2 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono font-medium">{task.workNumber}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {STAGE_LABELS[task.stage]} · {task.completedAt ? when.format(task.completedAt) : ""} · {formatDuration(activeMs)}
+                    </p>
+                  </div>
+                  <ViewButton href={`/operator/tasks/${task._id}`} label={`View ${task.workNumber}`} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
-      {cards.length === 0 ? (
-        <EmptyState title="No work is assigned to you." />
-      ) : (
-        STAGES.filter((stage) => user.capabilities.includes(stage) || cards.some((r) => r.task.stage === stage)).map((stage) => {
-          const list = cards.filter((r) => r.task.stage === stage).sort((a, b) => Number(b.task.status === "IN_PROGRESS") - Number(a.task.status === "IN_PROGRESS"));
-          return (
-            <section key={stage} aria-labelledby={`q-${stage}`} className="space-y-3">
-              <h2 id={`q-${stage}`} className="text-lg font-semibold">
-                {STAGE_LABELS[stage]} queue <span className="font-normal text-muted-foreground">· {list.length}</span>
-              </h2>
-              {list.length === 0 ? (
-                <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} assigned to you.`} />
-              ) : (
-                <ol className="grid gap-4 xl:grid-cols-2">
-                  {list.map(({ task, rule, card }, i) => {
-                    const id = task._id.toString();
-                    const header = (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold" aria-label={`Position ${i + 1}`}>
-                          #{i + 1}
-                        </span>
-                        <TaskStatusBadge status={task.status} />
-                        {task.status === "IN_PROGRESS" && <span className="text-xs font-semibold tracking-wide text-brand-gold uppercase">Working now</span>}
-                      </div>
-                    );
-                    const actions = (
-                      <div className="space-y-3">
-                        {task.status !== "IN_PROGRESS" && (
-                          <TaskActions taskId={id} workNumber={task.workNumber} stage={task.stage} status={task.status} canStart={rule.canStart} reason={rule.reason} totalPanels={0} startOnly />
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          <ViewButton href={`/operator/tasks/${id}`} label={`View ${task.workNumber}`} />
-                          <Link href={`/operator/tasks/${id}/card`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                            Print job card
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                    return (
-                      <li key={id}>
-                        {card ? (
-                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header}>
-                            {actions}
-                          </JobSummaryCard>
-                        ) : (
-                          <div className="rounded-lg bg-card p-4">
-                            {task.workNumber} {actions}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
-            </section>
-          );
-        })
+      {issues.length > 0 && (
+        <section aria-labelledby="my-issues" className="space-y-3">
+          <h2 id="my-issues" className="text-lg font-semibold">
+            Problems I reported
+          </h2>
+          <IssueList rows={issues} staff={false} />
+        </section>
       )}
-
-      <DailyBarChart data={stats.completedPerDay} title="Work I completed" unit="Stages completed" />
     </div>
   );
 }

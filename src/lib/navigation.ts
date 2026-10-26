@@ -55,7 +55,8 @@ export function navigationFor(user: { role: Role; permissions: readonly Permissi
       return [
         {
           items: [
-            { href: "/operator", label: "My queue", icon: Task01Icon },
+            { href: "/operator", label: "Overview", icon: DashboardSquare01Icon },
+            { href: "/operator/queue", label: "My queue", icon: Task01Icon },
             { href: "/operator/history", label: "History", icon: WorkHistoryIcon },
           ],
         },

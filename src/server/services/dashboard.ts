@@ -5,6 +5,7 @@ import { connectDb } from "@/server/db/connect";
 import { CutlistVersion } from "@/server/db/models/CutlistVersion";
 import { Issue } from "@/server/db/models/Issue";
 import { Job } from "@/server/db/models/Job";
+import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
@@ -117,4 +118,59 @@ export async function operatorDashboard(operatorId: string, now = new Date()) {
     hoursThisWeek: Math.round((workedMs / 3_600_000) * 10) / 10,
     completedPerDay,
   };
+}
+
+/** The lists behind "Needs attention", the queue snapshots and recent activity. */
+export async function commandCentre() {
+  await connectDb();
+  const [unassigned, issues, awaitingMaterial, events, cutting, edging] = await Promise.all([
+    ProductionTask.find({ status: { $in: ["BLOCKED", "QUEUED", "PAUSED"] }, assignedOperatorId: null })
+      .sort({ queueSeq: 1, createdAt: 1 })
+      .limit(6)
+      .select("workNumber stage status")
+      .lean(),
+    Issue.find({ status: "OPEN" }).sort({ createdAt: -1 }).limit(6).select("workNumber category reporterRole createdAt").lean(),
+    Job.find({ status: "AWAITING_MATERIAL" }).sort({ updatedAt: 1 }).limit(6).select("workNumber title updatedAt").lean(),
+    JobStatusEvent.find().sort({ at: -1 }).limit(12).lean(),
+    ProductionTask.find({ stage: "CUTTING", status: { $in: ["QUEUED", "IN_PROGRESS", "PAUSED"] } }).sort({ queueSeq: 1 }).limit(6).lean(),
+    ProductionTask.find({ stage: "EDGING", status: { $in: ["QUEUED", "IN_PROGRESS", "PAUSED"] } }).sort({ queueSeq: 1 }).limit(6).lean(),
+  ]);
+  const [jobs, people] = await Promise.all([
+    Job.find({ _id: { $in: events.map((e) => e.jobId) } }).select("workNumber").lean(),
+    User.find({ _id: { $in: [...events.map((e) => e.actorId), ...cutting.map((t) => t.assignedOperatorId), ...edging.map((t) => t.assignedOperatorId)].filter(Boolean) } })
+      .select("name")
+      .lean(),
+  ]);
+  const workNumber = new Map(jobs.map((j) => [j._id.toString(), j.workNumber]));
+  const name = new Map(people.map((p) => [p._id.toString(), p.name]));
+  const snapshot = (tasks: typeof cutting) =>
+    tasks.map((t) => ({
+      id: t._id.toString(),
+      workNumber: t.workNumber,
+      queueSeq: t.queueSeq,
+      status: t.status,
+      operator: t.assignedOperatorId ? name.get(t.assignedOperatorId.toString()) : undefined,
+    }));
+
+  return {
+    unassigned: unassigned.map((t) => ({ id: t._id.toString(), workNumber: t.workNumber, stage: t.stage, queued: t.status !== "BLOCKED" })),
+    issues: issues.map((i) => ({ id: i._id.toString(), workNumber: i.workNumber, category: i.category, reporterRole: i.reporterRole, at: i.createdAt })),
+    awaitingMaterial: awaitingMaterial.map((j) => ({ workNumber: j.workNumber, title: j.title, since: j.updatedAt })),
+    cutting: snapshot(cutting),
+    edging: snapshot(edging),
+    activity: events.map((e) => ({
+      id: e._id.toString(),
+      at: e.at,
+      type: e.type,
+      note: e.note,
+      workNumber: workNumber.get(e.jobId.toString()),
+      actor: e.actorId ? name.get(e.actorId.toString()) : undefined,
+    })),
+  };
+}
+
+/** Problems this operator reported, newest first. */
+export async function operatorIssues(operatorId: string) {
+  await connectDb();
+  return Issue.find({ reportedBy: operatorId }).sort({ createdAt: -1 }).limit(5).lean();
 }

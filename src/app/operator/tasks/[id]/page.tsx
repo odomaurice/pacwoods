@@ -25,7 +25,7 @@ export default async function OperatorTaskPage({ params }: PageProps<"/operator/
 
   return (
     <>
-      <Link href="/operator" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/operator/queue" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
         ← My queue
       </Link>
       <PageHeader
