@@ -172,19 +172,22 @@ export default async function Home() {
               </a>
             ))}
           </nav>
-          <Link href={account.href} className={buttonVariants({ variant: "gold", className: "ml-auto h-11 rounded-full px-6 text-sm font-semibold lg:ml-0" })}>
+          <Link href={account.href} className={buttonVariants({ variant: "gold", className: "hidden h-11 rounded-full px-6 text-sm font-semibold lg:inline-flex" })}>
             {account.label}
           </Link>
-          <details className="relative lg:hidden">
+          <details className="relative ml-auto lg:hidden">
             <summary className="flex size-10 items-center justify-center rounded-md hover:bg-white/10 [&::-webkit-details-marker]:hidden" aria-label="Menu">
               <HugeiconsIcon icon={Menu01Icon} className="size-6" />
             </summary>
-            <nav aria-label="Sections" className="absolute right-0 mt-2 w-56 rounded-lg bg-brand-charcoal p-2 shadow-2xl ring-1 ring-white/10">
+            <nav aria-label="Sections" className="absolute right-0 mt-2 w-64 rounded-xl bg-brand-charcoal p-2 shadow-2xl ring-1 ring-white/10">
               {nav.map((n) => (
-                <a key={n.href} href={n.href} className="block rounded-md px-3 py-2.5 text-white/90 hover:bg-white/10">
+                <a key={n.href} href={n.href} className="block rounded-md px-3 py-3 text-white/90 hover:bg-white/10">
                   {n.label}
                 </a>
               ))}
+              <Link href={account.href} className={buttonVariants({ variant: "gold", className: "mt-2 h-12 w-full rounded-full text-base font-semibold" })}>
+                {account.label}
+              </Link>
             </nav>
           </details>
         </div>
