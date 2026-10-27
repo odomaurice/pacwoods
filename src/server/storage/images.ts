@@ -15,8 +15,21 @@ export type StoredImage =
   | { storage: "cloudinary"; publicId: string; version: number }
   | { storage: "gridfs"; fileId: Types.ObjectId; thumbId: Types.ObjectId };
 
+/**
+ * Cloudinary is configured either by CLOUDINARY_URL
+ * (cloudinary://API_KEY:API_SECRET@CLOUD_NAME), which the SDK reads itself,
+ * or by the three separate CLOUDINARY_CLOUD_NAME / _API_KEY / _API_SECRET.
+ */
+let configured = false;
 export function usingCloudinary() {
-  return Boolean(process.env.CLOUDINARY_URL);
+  if (process.env.CLOUDINARY_URL) return true;
+  const { CLOUDINARY_CLOUD_NAME: cloud_name, CLOUDINARY_API_KEY: api_key, CLOUDINARY_API_SECRET: api_secret } = process.env;
+  if (!cloud_name || !api_key || !api_secret) return false;
+  if (!configured) {
+    cloudinary.config({ cloud_name, api_key, api_secret, secure: true });
+    configured = true;
+  }
+  return true;
 }
 
 function bucket() {
@@ -51,6 +64,7 @@ export async function putImage(full: Buffer, thumb: Buffer, folder: string): Pro
 /** The image bytes as a web stream, or null if they are missing. */
 export async function readImage(image: StoredImage, size: "full" | "thumb"): Promise<ReadableStream | null> {
   if (image.storage === "cloudinary") {
+    usingCloudinary();
     const url = cloudinary.url(image.publicId, {
       type: "authenticated",
       sign_url: true,
@@ -67,6 +81,7 @@ export async function readImage(image: StoredImage, size: "full" | "thumb"): Pro
 
 export async function deleteImage(image: StoredImage) {
   if (image.storage === "cloudinary") {
+    usingCloudinary();
     await cloudinary.uploader.destroy(image.publicId, { type: "authenticated", invalidate: true }).catch(() => {});
     return;
   }
