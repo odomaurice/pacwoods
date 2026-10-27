@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/CutlistActions";
 import Detail from "@/components/Detail";
+import ExportButtons from "@/components/ExportButtons";
 import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
 import PageHeader from "@/components/PageHeader";
 import IssueList from "@/components/issues/IssueList";
@@ -158,6 +159,7 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
               </Link>
             )}
             {canApprove && <ApproveCutlistButton workNumber={job.workNumber} />}
+            {current && <ExportButtons href={`/api/exports/jobs/${job.workNumber}/cutlist`} label="Cutlist" />}
             {(job.status === "AWAITING_MATERIAL" || job.status === "QUEUED_FOR_CUTTING") && <ReopenCutlistButton workNumber={job.workNumber} />}
           </div>
         </div>

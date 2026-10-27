@@ -32,7 +32,7 @@ export default async function ClientJobCardPage({ params }: PageProps<"/client/j
         <Link href="/client/jobs" className={buttonVariants({ variant: "outline" })}>
           Back to my jobs
         </Link>
-        <PrintButton label="Print job card" />
+        <PrintButton label="Print / save as PDF" />
         <ReportIssueButton target={{ kind: "job", workNumber }} workNumber={workNumber} />
       </div>
       {myIssues.length > 0 && (

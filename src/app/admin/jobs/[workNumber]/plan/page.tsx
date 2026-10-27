@@ -5,6 +5,7 @@ import { ApproveCutlistButton } from "@/components/cutlist/CutlistActions";
 import type { DrawPart } from "@/components/cutlist/PlanDrawing";
 import PlanViewer, { Collapsible, Stats } from "@/components/cutlist/PlanViewer";
 import EmptyState from "@/components/EmptyState";
+import ExportButtons from "@/components/ExportButtons";
 import PageHeader from "@/components/PageHeader";
 import PrintButton from "@/components/PrintButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -82,7 +83,8 @@ export default async function PlanPage({ params }: PageProps<"/admin/jobs/[workN
             <Link href={`/admin/jobs/${workNumber}/cutlist`} className={buttonVariants({ variant: "outline" })}>
               {job.status === "DRAFT" ? "Edit cutlist" : "View cutlist"}
             </Link>
-            <PrintButton />
+            <ExportButtons href={`/api/exports/jobs/${workNumber}/cutlist`} label="Cutlist" />
+            <PrintButton label="Print / save as PDF" />
             {canApprove && <ApproveCutlistButton workNumber={workNumber} />}
           </span>
         }

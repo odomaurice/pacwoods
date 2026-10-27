@@ -23,7 +23,7 @@ export default async function StaffJobCardPage({ params }: PageProps<"/admin/job
         <Link href={`/admin/jobs/${workNumber}`} className={buttonVariants({ variant: "outline" })}>
           Back to job
         </Link>
-        <PrintButton label="Print job card" />
+        <PrintButton label="Print / save as PDF" />
       </div>
       <JobCard data={found.data} scanUrl={await scanUrl(found.qrToken)} audience="staff" />
     </div>

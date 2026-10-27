@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import EmptyState from "@/components/EmptyState";
+import ExportButtons from "@/components/ExportButtons";
 import JobTable from "@/components/JobTable";
 import { Pagination, SearchForm, listParams, withParams } from "@/components/ListControls";
 import PageHeader from "@/components/PageHeader";
@@ -23,9 +24,12 @@ export default async function JobsPage({ searchParams }: PageProps<"/admin/jobs"
       <PageHeader
         title="Jobs"
         actions={
-          <Link href="/admin/jobs/new" className={buttonVariants()}>
-            New job
-          </Link>
+          <>
+            <ExportButtons href={withParams("/api/exports/jobs", { q, status })} />
+            <Link href="/admin/jobs/new" className={buttonVariants()}>
+              New job
+            </Link>
+          </>
         }
       />
       <SearchForm placeholder="Search by work number, title or client" q={q}>

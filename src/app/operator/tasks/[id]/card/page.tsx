@@ -25,7 +25,7 @@ export default async function OperatorJobCardPage({ params }: PageProps<"/operat
         <Link href={`/operator/tasks/${id}`} className={buttonVariants({ variant: "outline" })}>
           Back to job
         </Link>
-        <PrintButton label="Print job card" />
+        <PrintButton label="Print / save as PDF" />
       </div>
       <JobCard data={card.data} scanUrl={await scanUrl(card.qrToken)} audience="staff" />
     </div>

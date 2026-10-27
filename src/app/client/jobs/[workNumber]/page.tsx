@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReportIssueButton } from "@/components/issues/IssueButtons";
 import IssueList from "@/components/issues/IssueList";
+import ExportButtons from "@/components/ExportButtons";
 import JobPhotos from "@/components/photos/JobPhotos";
 import PageHeader from "@/components/PageHeader";
 import { JobStatusBadge } from "@/components/StatusBadge";
@@ -43,6 +44,7 @@ export default async function ClientJobPage({ params }: PageProps<"/client/jobs/
             <Link href={`/client/jobs/${job.workNumber}/card`} className={buttonVariants({ variant: "outline" })}>
               Job card
             </Link>
+            {job.status !== "DRAFT" && <ExportButtons href={`/api/exports/jobs/${job.workNumber}/cutlist`} label="Cutlist" />}
             <ReportIssueButton target={{ kind: "job", workNumber: job.workNumber }} workNumber={job.workNumber} />
           </>
         }
