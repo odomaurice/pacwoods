@@ -22,7 +22,7 @@ const linkClass =
 
 function Wordmark() {
   return (
-    <Link href="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-white">
+    <Link href="/dashboard" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-white">
       <LogoMark className="h-8 w-auto" />
       <span>
         Pa<span className="text-brand-gold">C</span> WOODS

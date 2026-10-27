@@ -14,7 +14,9 @@ import { estimateMinutes, formatMinutes } from "@/lib/cutlist";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
 import { UNPLACED_REASONS, percent } from "@/lib/plan-text";
 import { PART_FILLS, cutLength } from "@/lib/plan-view";
+import { estimateAssumptions } from "@/lib/settings";
 import { requireRole } from "@/server/auth/guards";
+import { getSettings } from "@/server/services/settings";
 import { loadJobCutlist, planIsCurrent } from "@/server/services/cutlists";
 
 export const metadata: Metadata = { title: "Cutting plan | Pacwoods" };
@@ -63,7 +65,7 @@ export default async function PlanPage({ params }: PageProps<"/admin/jobs/[workN
   );
   const t = plan.totals;
   const ops = job.operations ?? { cutting: true, edging: false };
-  const estimate = estimateMinutes(t, current, ops);
+  const estimate = estimateMinutes(t, current, ops, estimateAssumptions(await getSettings()));
   const canApprove = job.status === "DRAFT" && current.state === "DRAFT" && upToDate && plan.unplaced.length === 0;
 
   // "64×45 ×6 · Brent": sheets used per stock size.

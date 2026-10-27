@@ -6,7 +6,9 @@ import { GRAIN_LABELS, describeEdges, estimateMinutes, formatMinutes } from "@/l
 import { edgingLength } from "@/lib/cutting/engine";
 import { STAGE_LABELS, formatDuration, type Stage, type TaskStatus } from "@/lib/production";
 import { PART_FILLS } from "@/lib/plan-view";
+import { estimateAssumptions } from "@/lib/settings";
 import type { CutlistVersionDoc } from "@/server/db/models/CutlistVersion";
+import { getSettings } from "@/server/services/settings";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
@@ -25,10 +27,11 @@ export type TaskDetailProps = {
 };
 
 /** What the operator needs at the machine for one stage of one job. */
-export default function TaskDetail(p: TaskDetailProps) {
+export default async function TaskDetail(p: TaskDetailProps) {
+  const assumptions = estimateAssumptions(await getSettings());
   const cl = p.cutlist;
   const totalPanels = cl?.parts.reduce((n, x) => n + x.quantity, 0) ?? 0;
-  const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, { cutting: p.stage === "CUTTING", edging: p.stage === "EDGING" }) : null;
+  const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, { cutting: p.stage === "CUTTING", edging: p.stage === "EDGING" }, assumptions) : null;
   const banded = cl?.parts.filter((x) => x.edges.length1 || x.edges.length2 || x.edges.width1 || x.edges.width2) ?? [];
   const drawParts: DrawPart[] = (cl?.parts ?? []).map((x, i) => ({ ref: x.ref, label: x.label || `#${i + 1}`, fill: PART_FILLS[i % PART_FILLS.length], edges: x.edges }));
   const stockLabels = Object.fromEntries(

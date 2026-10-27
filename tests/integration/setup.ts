@@ -9,6 +9,7 @@ import { Issue } from "@/server/db/models/Issue";
 import { Photo } from "@/server/db/models/Photo";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { Notification } from "@/server/db/models/Notification";
+import { SystemSetting } from "@/server/db/models/SystemSetting";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { Job } from "@/server/db/models/Job";
@@ -31,7 +32,7 @@ export async function connectTestDb() {
   if (process.env.MONGODB_DB === "pacwoods") throw new Error("Refusing to test against the main database");
   await connectDb();
   await dropAllCollections();
-  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue, Photo, Notification]) await model.syncIndexes();
+  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue, Photo, Notification, SystemSetting]) await model.syncIndexes();
 }
 
 export async function disconnectTestDb() {

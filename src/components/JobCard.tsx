@@ -5,6 +5,8 @@ import { edgingLength } from "@/lib/cutting/engine";
 import { JOB_STATUS_LABELS, type JobStatus } from "@/lib/jobs";
 import type { StoredPart, StoredStock } from "@/server/db/models/CutlistVersion";
 import type { Plan } from "@/lib/cutting/types";
+import { estimateAssumptions } from "@/lib/settings";
+import { getSettings } from "@/server/services/settings";
 
 export type JobCardData = {
   workNumber: string;
@@ -65,7 +67,7 @@ export default async function JobCard({
       materials.set(name, m);
     }
   }
-  const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, data.operations) : null;
+  const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, data.operations, estimateAssumptions(await getSettings())) : null;
 
   return (
     <article className="mx-auto max-w-[190mm] space-y-5 bg-white p-6 text-brand-charcoal print:max-w-none print:p-0">

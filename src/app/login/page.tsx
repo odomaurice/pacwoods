@@ -7,7 +7,7 @@ import LoginForm from "./LoginForm";
 export const metadata: Metadata = { title: "Sign in | Pacwoods" };
 
 export default async function LoginPage() {
-  if (await getSessionUser()) redirect("/");
+  if (await getSessionUser()) redirect("/dashboard");
 
   return (
     <AuthFrame

@@ -10,7 +10,7 @@ export default function MessagePage({ title, children }: { title: string; childr
       <LogoMark className="h-14 w-auto" />
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="max-w-md text-white/90">{children}</p>
-      <Link href="/" className={buttonVariants({ variant: "secondary", className: "h-11 px-5" })}>
+      <Link href="/dashboard" className={buttonVariants({ variant: "secondary", className: "h-11 px-5" })}>
         Go to my home page
       </Link>
     </main>

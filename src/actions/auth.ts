@@ -14,8 +14,8 @@ export async function signInAction(input: SignInInput): Promise<ActionResult> {
   if (!parsed.success) return { error: "Enter your phone number or email and password." };
 
   try {
-    // Throws Next's redirect on success; "/" sends each role to its home.
-    await signIn("credentials", { ...parsed.data, redirectTo: "/" });
+    // Throws Next's redirect on success; /dashboard sends each role to its home.
+    await signIn("credentials", { ...parsed.data, redirectTo: "/dashboard" });
   } catch (error) {
     if (error instanceof AuthError) {
       const code = "code" in error ? error.code : undefined;

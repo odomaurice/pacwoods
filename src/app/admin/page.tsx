@@ -4,6 +4,7 @@ import { JobsPerDayChart, JobsSunburst, SheetsByMaterialChart, WorkloadChart } f
 import { ActivityFeed, CommandHeader, NeedsAttention, QueueSnapshots } from "@/components/dashboard/CommandCentre";
 import { buttonVariants } from "@/components/ui/button";
 import { requireRole } from "@/server/auth/guards";
+import { getSettings } from "@/server/services/settings";
 import { commandCentre, staffDashboard } from "@/server/services/dashboard";
 
 export const metadata: Metadata = { title: "Overview | Pacwoods" };
@@ -17,6 +18,7 @@ export default async function AdminOverview() {
     <div className="space-y-6">
       <CommandHeader
         name={user.name}
+        timeZone={(await getSettings()).timeZone}
         figures={[
           { label: "Active jobs", value: d.kpis.active, href: "/admin/jobs" },
           { label: "In production", value: d.kpis.inProduction, href: "/admin/queues" },

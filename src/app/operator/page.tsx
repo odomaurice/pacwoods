@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import ViewButton from "@/components/ViewButton";
 import { STAGE_LABELS, formatDuration } from "@/lib/production";
 import { requireRole } from "@/server/auth/guards";
+import { getSettings } from "@/server/services/settings";
 import { operatorDashboard, operatorIssues } from "@/server/services/dashboard";
 import { getJobCardData, scanUrl } from "@/server/services/jobCards";
 import { operatorHistory, operatorQueue } from "@/server/services/production";
@@ -33,6 +34,7 @@ export default async function OperatorOverview() {
     <div className="space-y-6">
       <CommandHeader
         name={user.name}
+        timeZone={(await getSettings()).timeZone}
         figures={[
           { label: "In my queue", value: stats.waiting, href: "/operator/queue" },
           { label: "Completed this week", value: stats.completedThisWeek, href: "/operator/history" },

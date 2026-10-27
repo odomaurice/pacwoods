@@ -2,6 +2,7 @@ import {
   Briefcase01Icon,
   Alert02Icon,
   ChartIcon,
+  Settings02Icon,
   DashboardSquare01Icon,
   WorkHistoryIcon,
   ListViewIcon,
@@ -55,7 +56,14 @@ function baseNavigation(user: { role: Role; permissions: readonly Permission[] }
         { title: "People", items: people },
       ];
       if (user.role === "SUPER_ADMIN") {
-        sections.push({ title: "Oversight", items: [{ href: "/admin/reports", label: "Reports", icon: ChartIcon }, { href: "/admin/audit", label: "Audit log", icon: Note01Icon }] });
+        sections.push({
+          title: "Oversight",
+          items: [
+            { href: "/admin/reports", label: "Reports", icon: ChartIcon },
+            { href: "/admin/audit", label: "Audit log", icon: Note01Icon },
+            { href: "/admin/settings", label: "Settings", icon: Settings02Icon },
+          ],
+        });
       } else {
         sections.push({ title: "Oversight", items: [{ href: "/admin/reports", label: "Reports", icon: ChartIcon }] });
       }

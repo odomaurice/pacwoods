@@ -9,6 +9,7 @@ import { CutlistVersion, type CutlistVersionDoc, type StoredPart, type StoredSto
 import { Job } from "@/server/db/models/Job";
 import { Material } from "@/server/db/models/Material";
 import { audit } from "@/server/services/audit";
+import { getSettings } from "@/server/services/settings";
 import { ServiceError, type Actor } from "@/server/services/users";
 import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
@@ -72,8 +73,9 @@ export async function getCutlists(jobId: Types.ObjectId) {
   };
 }
 
-export function emptyCutlist(): CutlistInput {
-  return { parts: [], stockSheets: [], options: DEFAULT_OPTIONS };
+export async function emptyCutlist(): Promise<CutlistInput> {
+  const s = await getSettings();
+  return { parts: [], stockSheets: [], options: { ...DEFAULT_OPTIONS, kerf: s.kerf, edgeTrim: s.edgeTrim, edgeBandThickness: s.edgeBandThickness } };
 }
 
 /** True when the stored plan was generated from exactly these inputs. */

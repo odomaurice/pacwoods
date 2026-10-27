@@ -16,15 +16,25 @@ function when(d: Date) {
 }
 
 /** Charcoal welcome band with the day's headline numbers. */
-export function CommandHeader({ name, figures, actions }: { name: string; figures: Array<{ label: string; value: number; href: string; alert?: boolean }>; actions: ReactNode }) {
-  const hour = new Date().getHours();
+export function CommandHeader({
+  name,
+  figures,
+  actions,
+  timeZone = "UTC",
+}: {
+  name: string;
+  figures: Array<{ label: string; value: number; href: string; alert?: boolean }>;
+  actions: ReactNode;
+  timeZone?: string;
+}) {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone }).format(new Date()));
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return (
     <section className="overflow-hidden rounded-xl bg-brand-charcoal text-white">
       <div className="flex flex-wrap items-start justify-between gap-4 p-5 sm:p-6">
         <div>
           <p className="text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase">
-            {new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}
+            {new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone }).format(new Date())}
           </p>
           <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">
             {greeting}, {name.split(" ")[0]}

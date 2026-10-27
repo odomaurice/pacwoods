@@ -30,6 +30,15 @@ const ACTION_LABELS: Record<string, string> = {
   "material.activated": "Material restored",
   "job.created": "Job created",
   "job.updated": "Job updated",
+  "settings.updated": "Settings changed",
+  "cutlist.approved": "Cutlist approved",
+  "cutlist.reopened": "Cutlist reopened",
+  "task.assigned": "Operator assigned",
+  "issue.resolved": "Issue resolved",
+  "photo.deleted": "Photo removed",
+  "job.material_confirmed": "Materials confirmed",
+  "job.material_withdrawn": "Materials withdrawn",
+  "material.standard_added": "Standard materials added",
 };
 
 export default async function AuditPage({ searchParams }: PageProps<"/admin/audit">) {

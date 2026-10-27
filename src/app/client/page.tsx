@@ -8,6 +8,7 @@ import ViewButton from "@/components/ViewButton";
 import { eventLabel } from "@/lib/events";
 import { describeOperations } from "@/lib/jobs";
 import { requireRole } from "@/server/auth/guards";
+import { getSettings } from "@/server/services/settings";
 import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Issue } from "@/server/db/models/Issue";
@@ -44,6 +45,7 @@ export default async function ClientOverview() {
     <div className="space-y-6">
       <CommandHeader
         name={user.name}
+        timeZone={(await getSettings()).timeZone}
         figures={[
           { label: "All jobs", value: jobs.length, href: "/client/jobs" },
           { label: "Active", value: active.length, href: "/client/jobs" },

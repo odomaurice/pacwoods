@@ -35,7 +35,7 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
         stockSheets: current.stockSheets.map(pickStock),
         options: current.options,
       }
-    : emptyCutlist();
+    : await emptyCutlist();
 
   return (
     <>

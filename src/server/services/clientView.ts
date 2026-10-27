@@ -7,7 +7,9 @@ import { Job } from "@/server/db/models/Job";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
+import { estimateAssumptions } from "@/lib/settings";
 import { getCutlists } from "@/server/services/cutlists";
+import { getSettings } from "@/server/services/settings";
 
 export type StepState = "done" | "current" | "upcoming" | "na";
 export type Step = { key: string; label: string; state: StepState; at?: Date; detail?: string };
@@ -79,7 +81,7 @@ export async function clientJobView(clientUserId: string, workNumber: string) {
   });
 
   const plan = cutlists.approved?.plan;
-  const estimate = plan && cutlists.approved ? estimateMinutes(plan.totals, cutlists.approved, job.operations ?? { cutting: true, edging: false }) : null;
+  const estimate = plan && cutlists.approved ? estimateMinutes(plan.totals, cutlists.approved, job.operations ?? { cutting: true, edging: false }, estimateAssumptions(await getSettings())) : null;
 
   return { job, steps, events, estimate };
 }
