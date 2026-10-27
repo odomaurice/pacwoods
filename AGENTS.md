@@ -62,8 +62,8 @@ business owner. Leave a marked gap and ask.
   reduced motion; content must stay visible without JavaScript). App screens
   stay flat.
 - Buttons on charcoal or gold grounds use the `gold`, `dark` and `onDark`
-  button variants, not a `className` background override (the default
-  variant's background wins).
+  button variants. `buttonVariants()` runs through tailwind-merge, so a
+  `className` (size, rounding) reliably overrides the variant's own classes.
 - Check layout with screenshots: headless Edge
   (`--headless=new --user-data-dir=<fresh dir> --screenshot`, one at a time
   with `Start-Process -Wait`). Windows clamps the window to ~500px, so test

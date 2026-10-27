@@ -90,6 +90,9 @@ const MATERIALS = [
   { name: "Hardboard", tone: "#7E5E40" },
 ];
 
+/** Large pill-shaped calls to action. */
+const pill = "h-16 rounded-full px-9 text-lg font-semibold";
+
 function Eyebrow({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
   return <p className={cn("text-xs font-semibold tracking-[0.3em] uppercase", dark ? "text-brand-gold" : "text-brand-gold-deep")}>{children}</p>;
 }
@@ -169,7 +172,7 @@ export default async function Home() {
               </a>
             ))}
           </nav>
-          <Link href={account.href} className={buttonVariants({ variant: "gold", className: "ml-auto lg:ml-0" })}>
+          <Link href={account.href} className={buttonVariants({ variant: "gold", className: "ml-auto h-11 rounded-full px-6 text-sm font-semibold lg:ml-0" })}>
             {account.label}
           </Link>
           <details className="relative lg:hidden">
@@ -207,11 +210,11 @@ export default async function Home() {
               <p className="mt-7 max-w-xl text-lg text-white/85 sm:text-xl">
                 Panel cutting, CNC machining and edge banding. Every job planned to save board, worked in order, and tracked online from your cutlist to collection.
               </p>
-              <div className="mt-9 flex flex-wrap gap-3">
-                <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: "h-14 px-7 text-base" })}>
+              <div className="mt-10 flex flex-wrap gap-4">
+                <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: `${pill} w-full sm:w-auto` })}>
                   {user ? account.label : "Track my job"}
                 </Link>
-                <a href="#planner" className={buttonVariants({ variant: "onDark", size: "lg", className: "h-14 px-7 text-base" })}>
+                <a href="#planner" className={buttonVariants({ variant: "onDark", size: "lg", className: `${pill} w-full sm:w-auto` })}>
                   Try the cutting planner
                 </a>
               </div>
@@ -350,7 +353,7 @@ export default async function Home() {
                   </li>
                 ))}
               </ul>
-              <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: "mt-10 h-14 px-7 text-base" })}>
+              <Link href={account.href} className={buttonVariants({ variant: "gold", size: "lg", className: `${pill} mt-10` })}>
                 {account.label}
               </Link>
             </div>
@@ -411,7 +414,7 @@ export default async function Home() {
             <h2 id="cta-title" className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-5xl">
               Already a Pacwoods client? Your jobs are waiting.
             </h2>
-            <Link href={account.href} className={buttonVariants({ variant: "dark", size: "lg", className: "h-14 px-8 text-base" })}>
+            <Link href={account.href} className={buttonVariants({ variant: "dark", size: "lg", className: `${pill} px-10` })}>
               {account.label}
             </Link>
           </div>
