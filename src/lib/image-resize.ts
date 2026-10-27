@@ -19,15 +19,44 @@ export async function shrinkForUpload(file: File, maxSide = 2000): Promise<Blob>
   }
 }
 
-/** Uploads one photo to a job; resolves with an error message, or null on success. */
-export async function uploadPhoto(file: File, fields: { workNumber: string; kind: "MATERIAL" | "FINISHED"; taskId?: string }) {
+/**
+ * Uploads one photo to a job; resolves with an error message, or null on
+ * success. `onProgress` gets 0–100: fetch cannot report upload progress, so
+ * this uses XMLHttpRequest. 100 is reported only once the server has stored it.
+ */
+export async function uploadPhoto(
+  file: File,
+  fields: { workNumber: string; kind: "MATERIAL" | "FINISHED"; taskId?: string },
+  onProgress?: (percent: number) => void,
+): Promise<string | null> {
+  onProgress?.(0);
   const body = new FormData();
   body.set("file", await shrinkForUpload(file), "photo.jpg");
   body.set("workNumber", fields.workNumber);
   body.set("kind", fields.kind);
   if (fields.taskId) body.set("taskId", fields.taskId);
-  const res = await fetch("/api/photos", { method: "POST", body });
-  if (res.ok) return null;
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
-  return data.error ?? "The photo could not be uploaded.";
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/photos");
+    // The bytes going up are most of the wait; the last 5% is the server
+    // re-encoding and storing the photo.
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(Math.min(95, Math.round((e.loaded / e.total) * 95)));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve(null);
+        return;
+      }
+      let error: string | undefined;
+      try {
+        error = (JSON.parse(xhr.responseText) as { error?: string }).error;
+      } catch {}
+      resolve(error ?? "The photo could not be uploaded.");
+    };
+    xhr.onerror = () => resolve("The photo could not be uploaded. Check the connection and try again.");
+    xhr.send(body);
+  });
 }

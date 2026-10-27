@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import ConfirmAction from "@/components/ConfirmAction";
 import { Button } from "@/components/ui/button";
 import { uploadPhoto } from "@/lib/image-resize";
+import UploadPreviews, { type UploadState } from "./UploadPreviews";
 
 /** Take or choose photos (several at once); each is shrunk, then uploaded. */
 export function PhotoUploader({
@@ -25,18 +26,32 @@ export function PhotoUploader({
 }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [states, setStates] = useState<UploadState[]>([]);
   const [busy, setBusy] = useState<string>();
 
-  async function onFiles(files: FileList | null) {
-    if (!files?.length) return;
+  async function onFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const chosen = [...list];
+    setFiles(chosen);
+    setStates(chosen.map(() => ({})));
+    const mark = (i: number, s: UploadState) => setStates((prev) => prev.map((p, j) => (j === i ? s : p)));
     let ok = 0;
-    for (const [i, file] of [...files].entries()) {
-      setBusy(`Uploading ${i + 1} of ${files.length}…`);
-      const error = await uploadPhoto(file, { workNumber, kind, taskId });
-      if (error) toast.error(error);
-      else ok++;
+    for (const [i, file] of chosen.entries()) {
+      const error = await uploadPhoto(file, { workNumber, kind, taskId }, (percent) => {
+        mark(i, { percent });
+        setBusy(chosen.length === 1 ? `Uploading ${percent}%` : `Uploading ${i + 1} of ${chosen.length} · ${percent}%`);
+      });
+      if (error) {
+        toast.error(error);
+        mark(i, { error: true });
+      } else {
+        ok++;
+        mark(i, { done: true });
+      }
     }
     setBusy(undefined);
+    setFiles([]);
     if (input.current) input.current.value = "";
     if (ok) {
       toast.success(ok === 1 ? "Photo added." : `${ok} photos added.`);
@@ -45,7 +60,7 @@ export function PhotoUploader({
   }
 
   return (
-    <>
+    <span className="relative inline-block">
       <input
         ref={input}
         type="file"
@@ -60,7 +75,12 @@ export function PhotoUploader({
         <HugeiconsIcon icon={Camera01Icon} className="size-4" />
         {busy ?? label}
       </Button>
-    </>
+      {files.length > 0 && (
+        <span className="absolute top-full right-0 z-20 mt-2 block w-64 rounded-lg bg-card p-2 shadow-lg ring-1 ring-foreground/10">
+          <UploadPreviews files={files} states={states} className="grid-cols-4 sm:grid-cols-4" />
+        </span>
+      )}
+    </span>
   );
 }
 

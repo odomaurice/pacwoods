@@ -31,6 +31,8 @@ const ACTION_LABELS: Record<string, string> = {
   "job.created": "Job created",
   "job.updated": "Job updated",
   "settings.updated": "Settings changed",
+  "user.password_reset_requested": "Password reset requested",
+  "user.password_reset_completed": "Password reset by email",
   "cutlist.approved": "Cutlist approved",
   "cutlist.reopened": "Cutlist reopened",
   "task.assigned": "Operator assigned",

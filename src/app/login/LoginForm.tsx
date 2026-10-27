@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInAction } from "@/actions/auth";
@@ -53,7 +54,10 @@ export default function LoginForm() {
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <p className="text-sm text-muted-foreground">
-        Forgotten your password? Ask a Pacwoods administrator to reset it.
+        <Link href="/forgot-password" className="font-medium text-foreground underline underline-offset-4">
+          Forgot your password?
+        </Link>{" "}
+        No email on your account? Ask Pacwoods at the counter.
       </p>
     </form>
   );

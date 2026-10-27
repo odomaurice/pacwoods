@@ -22,7 +22,8 @@ describe.skipIf(!hasDatabase)("photos (MongoDB)", () => {
   const done = { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 };
 
   beforeAll(async () => {
-    delete process.env.CLOUDINARY_URL; // tests use the database store
+    // Tests use the database store, never the real Cloudinary account.
+    for (const key of ["CLOUDINARY_URL", "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"]) delete process.env[key];
     await connectTestDb();
     jpeg = await sharp({ create: { width: 2400, height: 1800, channels: 3, background: "#b07a40" } }).jpeg().toBuffer();
     const { user } = await bootstrapSuperAdmin({ name: "Root", email: "root@ph.test" });

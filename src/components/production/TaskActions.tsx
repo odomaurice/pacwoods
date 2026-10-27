@@ -49,7 +49,7 @@ export default function TaskActions({ taskId, workNumber, stage, status, canStar
       <div className="flex flex-wrap gap-2">
         {(status === "QUEUED" || status === "PAUSED") && (
           <ConfirmAction
-            large
+            large={!startOnly}
             disabled={!canStart}
             label={status === "PAUSED" ? `Resume ${word}` : `Start ${word}`}
             title={status === "PAUSED" ? `Resume ${word} for ${workNumber}?` : `Start ${word} for ${workNumber}?`}
@@ -66,7 +66,7 @@ export default function TaskActions({ taskId, workNumber, stage, status, canStar
         )}
         {status !== "COMPLETED" && !startOnly && <ReportIssueButton large target={{ kind: "task", taskId }} workNumber={workNumber} />}
       </div>
-      {!canStart && reason && status !== "IN_PROGRESS" && <p className="text-sm text-muted-foreground">{reason}</p>}
+      {!canStart && reason && status !== "IN_PROGRESS" && <p className={startOnly ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{reason}</p>}
       {status === "IN_PROGRESS" && finishedPhotos === 0 && (
         <p className="text-sm font-medium text-brand-gold-deep">Add at least one photo of the finished work (below) before completing.</p>
       )}

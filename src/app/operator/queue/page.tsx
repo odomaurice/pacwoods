@@ -41,12 +41,12 @@ export default async function OperatorQueue() {
               {list.length === 0 ? (
                 <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} assigned to you.`} />
               ) : (
-                <ol className="grid gap-4 xl:grid-cols-2">
+                <ol className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                   {list.map(({ task, rule, card }, i) => {
                     const id = task._id.toString();
                     const header = (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold" aria-label={`Position ${i + 1}`}>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold" aria-label={`Position ${i + 1}`}>
                           #{i + 1}
                         </span>
                         <TaskStatusBadge status={task.status} />
@@ -54,7 +54,7 @@ export default async function OperatorQueue() {
                       </div>
                     );
                     const actions = (
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {task.status !== "IN_PROGRESS" && (
                           <TaskActions taskId={id} workNumber={task.workNumber} stage={task.stage} status={task.status} canStart={rule.canStart} reason={rule.reason} totalPanels={0} startOnly />
                         )}
@@ -69,7 +69,7 @@ export default async function OperatorQueue() {
                     return (
                       <li key={id}>
                         {card ? (
-                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header}>
+                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header} compact>
                             {actions}
                           </JobSummaryCard>
                         ) : (

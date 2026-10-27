@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadPhoto } from "@/lib/image-resize";
+import UploadPreviews, { type UploadState } from "@/components/photos/UploadPreviews";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createJobAction, updateJobAction } from "@/actions/jobs";
@@ -39,6 +40,7 @@ export default function JobForm({
   const router = useRouter();
   const [serverError, setServerError] = useState<string>();
   const [photos, setPhotos] = useState<File[]>([]);
+  const [uploads, setUploads] = useState<UploadState[]>([]);
   const [progress, setProgress] = useState<string>();
   const [pending, startTransition] = useTransition();
   const editing = Boolean(existing);
@@ -75,10 +77,15 @@ export default function JobForm({
         setServerError(result.error);
         return;
       }
+      const mark = (i: number, s: UploadState) => setUploads((prev) => prev.map((p, j) => (j === i ? s : p)));
+      setUploads(photos.map(() => ({})));
       for (const [i, file] of photos.entries()) {
-        setProgress(`Uploading photo ${i + 1} of ${photos.length}…`);
-        const error = await uploadPhoto(file, { workNumber: result.workNumber, kind: "MATERIAL" });
+        const error = await uploadPhoto(file, { workNumber: result.workNumber, kind: "MATERIAL" }, (percent) => {
+          mark(i, { percent });
+          setProgress(`Uploading photo ${i + 1} of ${photos.length} · ${percent}%`);
+        });
         if (error) toast.error(error);
+        mark(i, error ? { error: true } : { done: true });
       }
       setProgress(undefined);
       router.push(`/admin/jobs/${result.workNumber}`);
@@ -150,9 +157,23 @@ export default function JobForm({
             capture="environment"
             multiple
             className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-4 file:py-2.5 file:font-medium"
-            onChange={(e) => setPhotos([...(e.target.files ?? [])].slice(0, 12))}
+            onChange={(e) => {
+              setPhotos((prev) => [...prev, ...(e.target.files ?? [])].slice(0, 12));
+              e.target.value = "";
+            }}
           />
-          {photos.length > 0 && <p className="text-sm text-muted-foreground">{photos.length} photo{photos.length === 1 ? "" : "s"} will be added to the job.</p>}
+          {photos.length > 0 && (
+            <>
+              <UploadPreviews
+                files={photos}
+                states={uploads}
+                onRemove={pending ? undefined : (i) => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+              />
+              <p className="text-sm text-muted-foreground">
+                {photos.length} photo{photos.length === 1 ? "" : "s"} will be added to the job{photos.length === 12 ? " (12 at most)" : ""}.
+              </p>
+            </>
+          )}
         </div>
       )}
 
