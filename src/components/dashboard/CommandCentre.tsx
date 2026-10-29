@@ -97,7 +97,7 @@ export function NeedsAttention({ data, counts }: { data: Attention; counts: { un
       <h2 id="attention" className="text-lg font-semibold">
         Needs attention
       </h2>
-      <Group icon={UserAdd01Icon} title="Needs an operator" count={counts.unassigned} href="/admin/queues" empty="Every stage has an operator.">
+      <Group icon={UserAdd01Icon} title="Waiting to be taken" count={counts.unassigned} href="/admin/queues" empty="Every ready job has been taken.">
         {data.unassigned.map((t) => (
           <Row
             key={t.id}

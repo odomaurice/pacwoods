@@ -48,7 +48,7 @@ export async function clientJobView(clientUserId: string, workNumber: string) {
   const stageDetail = (t: typeof cut, word: string) => {
     if (!t) return undefined;
     const name = t.assignedOperatorId ? opName.get(t.assignedOperatorId.toString()) : undefined;
-    const parts = [name ? `${word} operator: ${name}` : `${word} operator: not assigned yet`];
+    const parts = [name ? `${word} operator: ${name}` : `${word} operator: the first free operator, when the work starts`];
     if ((t.status as TaskStatus) === "PAUSED") parts.push("paused for now");
     return parts.join(" · ");
   };

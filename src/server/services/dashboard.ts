@@ -9,6 +9,7 @@ import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
+import { capabilitiesOf, visibleFilter } from "@/server/services/production";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -28,7 +29,7 @@ export async function staffDashboard(now = new Date()) {
     Issue.countDocuments({ status: "OPEN" }),
     // A completed job is not modified again, so updatedAt is its completion time.
     Job.countDocuments({ status: "COMPLETED", updatedAt: { $gte: since30 } }),
-    ProductionTask.countDocuments({ status: { $in: ["BLOCKED", "QUEUED", "PAUSED"] }, assignedOperatorId: null }),
+    ProductionTask.countDocuments({ status: { $in: ["QUEUED", "PAUSED"] }, assignedOperatorId: null }),
     ProductionTask.aggregate<{ _id: { op: string; stage: "CUTTING" | "EDGING" }; count: number }>([
       { $match: { status: { $in: ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] }, assignedOperatorId: { $ne: null } } },
       { $group: { _id: { op: "$assignedOperatorId", stage: "$stage" }, count: { $sum: 1 } } },
@@ -95,7 +96,7 @@ export async function operatorDashboard(operatorId: string, now = new Date()) {
   const weekAgo = new Date(now.getTime() - 7 * DAY);
 
   const [waiting, done, sessions] = await Promise.all([
-    ProductionTask.countDocuments({ assignedOperatorId: me, status: { $in: ["BLOCKED", "QUEUED", "PAUSED", "IN_PROGRESS"] } }),
+    ProductionTask.countDocuments(visibleFilter(me, await capabilitiesOf(me))),
     ProductionTask.find({ completedBy: me, completedAt: { $gte: since14 } }).select("completedAt").lean(),
     ProcessingSession.find({ operatorId: me, startedAt: { $gte: weekAgo } }).select("startedAt endedAt").lean(),
   ]);
@@ -124,7 +125,7 @@ export async function operatorDashboard(operatorId: string, now = new Date()) {
 export async function commandCentre() {
   await connectDb();
   const [unassigned, issues, awaitingMaterial, events, cutting, edging] = await Promise.all([
-    ProductionTask.find({ status: { $in: ["BLOCKED", "QUEUED", "PAUSED"] }, assignedOperatorId: null })
+    ProductionTask.find({ status: { $in: ["QUEUED", "PAUSED"] }, assignedOperatorId: null })
       .sort({ queueSeq: 1, createdAt: 1 })
       .limit(6)
       .select("workNumber stage status")

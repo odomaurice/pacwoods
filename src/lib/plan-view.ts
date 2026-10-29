@@ -1,5 +1,6 @@
 /** Presentation helpers for a stored plan: grouping, the cuts table, colours. */
-import type { Cut, PlanSheet, Rect } from "@/lib/cutting/types";
+import { describeEdges } from "@/lib/cutlist";
+import type { Cut, Edges, PlanSheet, Rect } from "@/lib/cutting/types";
 
 /** Flat, distinct fills for panel types; dark text reads on all of them. */
 export const PART_FILLS = ["#F3E6CF", "#DDE8F0", "#E9DDEB", "#DCEBDD", "#F2DCD6", "#E4E2F2", "#EFEBC9", "#D9ECEA", "#F1E0EC", "#E6E6E1"];
@@ -43,4 +44,17 @@ export function cutRows(sheet: PlanSheet, partLabel: (ref: string) => string): C
 
 export function cutLength(sheet: PlanSheet) {
   return sheet.cuts.reduce((n, c) => n + Math.abs(c.x2 - c.x1) + Math.abs(c.y2 - c.y1), 0);
+}
+
+/** Cutlist parts as the cutting guide shows them; the row number prefixes each panel code (3.2). */
+export function guideParts(parts: Array<{ ref: string; label?: string | null; quantity: number; grain: string; edges: Edges }>) {
+  return parts.map((p, i) => ({
+    ref: p.ref,
+    no: i + 1,
+    label: p.label || `Part ${i + 1}`,
+    fill: PART_FILLS[i % PART_FILLS.length],
+    quantity: p.quantity,
+    edges: describeEdges(p.edges),
+    grain: p.grain !== "NONE",
+  }));
 }

@@ -10,7 +10,7 @@ import { getTaskForViewer } from "@/server/services/production";
 
 export const metadata: Metadata = { title: "Job card | Pacwoods" };
 
-/** Printable job card for work assigned to this operator. */
+/** Printable job card for work this operator can see. */
 export default async function OperatorJobCardPage({ params }: PageProps<"/operator/tasks/[id]/card">) {
   const user = await requireRole("OPERATOR");
   const { id } = await params;

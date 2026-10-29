@@ -36,6 +36,7 @@ const ACTION_LABELS: Record<string, string> = {
   "cutlist.approved": "Cutlist approved",
   "cutlist.reopened": "Cutlist reopened",
   "task.assigned": "Operator assigned",
+  "task.released": "Work released to the queue",
   "issue.resolved": "Issue resolved",
   "photo.deleted": "Photo removed",
   "job.material_confirmed": "Materials confirmed",

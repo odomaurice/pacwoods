@@ -15,7 +15,7 @@ describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
   let other: string;
 
   async function job(edging: boolean) {
-    const j = await createJob(root, { clientId: client.profileId, cutting: true, edging, materialsAvailable: true, cuttingOperatorId: op.id });
+    const j = await createJob(root, { clientId: client.profileId, cutting: true, edging, materialsAvailable: true });
     await generatePlan(root, j.workNumber, {
       parts: [{ ref: "P1", length: 600, width: 400, quantity: 2, grain: "NONE", edges: NO_EDGES }],
       stockSheets: [{ ref: "S1", length: 2440, width: 1220, quantity: 2, grained: false }],
@@ -49,14 +49,15 @@ describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
     const s = state(v.steps);
     expect(s).toMatchObject({ registered: "done", approved: "done", materials: "done", "cut-start": "current", "edge-start": "na", "edge-done": "na" });
     const cutStep = v.steps.find((x) => x.key === "cut-start")!;
-    expect(cutStep.detail).toContain("Cutting operator: Olu");
+    // Nobody has taken it yet: operators take work by starting it.
+    expect(cutStep.detail).toContain("Cutting operator: the first free operator");
     expect(cutStep.detail).toMatch(/[1-9]\d* jobs? ahead/);
     expect(v.estimate?.totalMin).toBeGreaterThan(0);
   });
 
   it("ticks steps off from real events as work happens", async () => {
-    // Clear the operator's earlier queued jobs so this one is next.
-    const queued = await ProductionTask.find({ assignedOperatorId: op.id, status: "QUEUED" }).sort({ queueSeq: 1 }).lean();
+    // Clear earlier cutting jobs: the oldest must be taken first.
+    const queued = await ProductionTask.find({ stage: "CUTTING", status: "QUEUED" }).sort({ queueSeq: 1 }).lean();
     for (const t of queued) {
       await startTask(op, t._id.toString());
       await addFinishedPhoto(t._id.toString(), op.id); await completeTask(op, t._id.toString(), { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 });

@@ -25,6 +25,11 @@ export async function loadTaskView(viewer: { id: string; role: string }, taskId:
     sessions,
     activeMs: activeMs(sessions),
     results: task.results,
+    guide: {
+      taskId: task._id.toString(),
+      done: [...(task.cutsDone ?? [])],
+      canTick: viewer.role === "OPERATOR" && task.status === "IN_PROGRESS" && task.activeOperatorId?.toString() === viewer.id,
+    },
   };
   const totalPanels = approved?.parts.reduce((n, p) => n + p.quantity, 0) ?? 0;
   return { task, job, rule, props, totalPanels };

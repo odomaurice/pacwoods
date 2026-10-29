@@ -7,6 +7,7 @@ export const EVENT_LABELS: Record<string, string> = {
   MATERIAL_CONFIRMED: "Materials confirmed available",
   MATERIAL_WITHDRAWN: "Materials confirmation withdrawn",
   OPERATOR_ASSIGNED: "Operator assigned",
+  TASK_RELEASED: "Released to the queue",
   CUTTING_STARTED: "Cutting started",
   CUTTING_PAUSED: "Cutting paused",
   CUTTING_RESUMED: "Cutting resumed",

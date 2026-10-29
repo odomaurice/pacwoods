@@ -22,11 +22,13 @@ export type QueueItem = { id: string; workNumber: string; status: TaskStatus; qu
 export type Eligibility = { canStart: boolean; reason?: string };
 
 /**
- * Which of one operator's assigned tasks may be started now.
+ * Which of the tasks an operator can see (open work nobody has taken, plus
+ * their own) may be started now.
  *
  * - One task at a time: while one is in progress, nothing else starts.
- * - Per stage, tasks run strictly in queue order: only the earliest queued or
- *   paused task can be started (or resumed); later ones wait for it.
+ * - Per stage, first in, first out: only the earliest queued or paused task
+ *   can be started (or resumed); later ones wait for it. Work another
+ *   operator has taken is not in the list, so it never holds anyone up.
  * - Edging waits for its job's cutting to finish.
  */
 export function eligibility(tasks: QueueItem[]): Map<string, Eligibility> {
@@ -39,7 +41,7 @@ export function eligibility(tasks: QueueItem[]): Map<string, Eligibility> {
       .sort((a, b) => (a.queueSeq ?? Infinity) - (b.queueSeq ?? Infinity));
     const head = waiting[0];
     for (const t of waiting) {
-      if (t !== head) result.set(t.id, { canStart: false, reason: `Waiting for ${head.workNumber}, which is earlier in your queue.` });
+      if (t !== head) result.set(t.id, { canStart: false, reason: head.status === "PAUSED" ? `Finish ${head.workNumber} first; you paused it and it is earlier in the queue.` : `Take ${head.workNumber} first; it is earlier in the queue.` });
       else if (active) result.set(t.id, { canStart: false, reason: `Finish or pause ${active.workNumber} first.` });
       else result.set(t.id, { canStart: true });
     }

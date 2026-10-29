@@ -10,6 +10,7 @@ import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
 import { notify } from "@/server/services/notifications";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
+import { capabilitiesOf, operatorCanSee } from "@/server/services/production";
 import { recordJobEvent } from "@/server/workflow/transitions";
 
 type Reporter = { id: string; role: string };
@@ -20,14 +21,14 @@ function parse(input: IssueReportInput) {
   return parsed.data;
 }
 
-/** An operator reports a problem on work assigned to them. */
+/** An operator reports a problem on work they can see (theirs, or open and not taken by someone else). */
 export async function reportIssueAsOperator(operator: Reporter, taskId: string, input: IssueReportInput) {
   if (operator.role !== "OPERATOR") throw new ServiceError("FORBIDDEN", "Only operators report production issues.");
   const data = parse(input);
   if (!mongoose.isValidObjectId(taskId)) throw new ServiceError("NOT_FOUND", "Task not found.");
   await connectDb();
   const task = await ProductionTask.findById(taskId).lean();
-  if (!task || task.assignedOperatorId?.toString() !== operator.id) throw new ServiceError("FORBIDDEN", "This work is not assigned to you.");
+  if (!task || !operatorCanSee(task, { id: operator.id, capabilities: await capabilitiesOf(operator.id) })) throw new ServiceError("FORBIDDEN", "Another operator has taken this work.");
 
   const issue = await Issue.create({
     jobId: task.jobId,

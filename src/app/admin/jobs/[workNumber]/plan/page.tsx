@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApproveCutlistButton } from "@/components/cutlist/CutlistActions";
 import type { DrawPart } from "@/components/cutlist/PlanDrawing";
+import CuttingGuide from "@/components/cutlist/CuttingGuide";
 import PlanViewer, { Collapsible, Stats } from "@/components/cutlist/PlanViewer";
 import EmptyState from "@/components/EmptyState";
 import ExportButtons from "@/components/ExportButtons";
@@ -13,7 +14,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { estimateMinutes, formatMinutes } from "@/lib/cutlist";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
 import { UNPLACED_REASONS, percent } from "@/lib/plan-text";
-import { PART_FILLS, cutLength } from "@/lib/plan-view";
+import { PART_FILLS, cutLength, guideParts } from "@/lib/plan-view";
 import { estimateAssumptions } from "@/lib/settings";
 import { requireRole } from "@/server/auth/guards";
 import { getSettings } from "@/server/services/settings";
@@ -162,6 +163,14 @@ export default async function PlanPage({ params }: PageProps<"/admin/jobs/[workN
       </section>
 
       <PlanViewer sheets={plan.sheets} parts={parts} stockLabels={stockLabels} showLabels={current.options.labelsOnPanels} />
+
+      <section className="mt-8 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Step-by-step cutting guide</h2>
+          <p className="text-sm text-muted-foreground">What the operator follows at the saw. Check it reads sensibly before approving.</p>
+        </div>
+        <CuttingGuide sheets={plan.sheets} parts={guideParts(current.parts)} stockLabels={stockLabels} kerf={current.options.kerf} edgeTrim={current.options.edgeTrim} />
+      </section>
     </>
   );
 }

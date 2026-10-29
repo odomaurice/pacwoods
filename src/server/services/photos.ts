@@ -10,19 +10,24 @@ import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { audit } from "@/server/services/audit";
 import { ServiceError } from "@/server/services/users";
 import { deleteImage, putImage, readImage, type StoredImage } from "@/server/storage/images";
+import { capabilitiesOf, operatorCanSee } from "@/server/services/production";
 import { recordJobEvent } from "@/server/workflow/transitions";
 
 type Viewer = { id: string; role: string };
 
 const isStaff = (v: Viewer) => v.role === "SUPER_ADMIN" || v.role === "ADMIN";
 
-/** Who may see a job's photos: staff, its operators, and its own client. */
+/**
+ * Who may see a job's photos: staff, its own client, and operators who can
+ * see one of its stages (open and not taken by someone else, theirs, or
+ * completed by them).
+ */
 export async function canViewJob(viewer: Viewer, jobId: Types.ObjectId) {
   if (isStaff(viewer)) return true;
   if (viewer.role === "OPERATOR") {
-    return Boolean(
-      await ProductionTask.exists({ jobId, $or: [{ assignedOperatorId: viewer.id }, { completedBy: viewer.id }] }),
-    );
+    const capabilities = await capabilitiesOf(viewer.id);
+    const tasks = await ProductionTask.find({ jobId }).select("stage status assignedOperatorId completedBy").lean();
+    return tasks.some((t) => operatorCanSee(t, { id: viewer.id, capabilities }));
   }
   if (viewer.role === "CLIENT") {
     const job = await Job.findById(jobId).select("clientId").lean();
@@ -59,12 +64,12 @@ export async function savePhoto(
     if (!input.taskId || !mongoose.isValidObjectId(input.taskId)) throw new ServiceError("INVALID", "Finished-work photos belong to a production stage.");
     const task = await ProductionTask.findOne({ _id: input.taskId, jobId: job._id }).lean();
     if (!task) throw new ServiceError("NOT_FOUND", "Stage not found.");
-    if (!isStaff(viewer) && task.assignedOperatorId?.toString() !== viewer.id) throw new ServiceError("FORBIDDEN", "This work is not assigned to you.");
+    if (!isStaff(viewer) && task.assignedOperatorId?.toString() !== viewer.id) throw new ServiceError("FORBIDDEN", "Start this work first; finished-work photos come from the operator doing it.");
     if (task.status === "COMPLETED" || task.status === "CANCELLED") throw new ServiceError("CONFLICT", "This stage is already closed.");
     taskId = task._id;
   } else if (!isStaff(viewer)) {
-    const onJob = viewer.role === "OPERATOR" && (await ProductionTask.exists({ jobId: job._id, assignedOperatorId: viewer.id }));
-    if (!onJob) throw new ServiceError("FORBIDDEN", "Only staff or this job's operators can add photos.");
+    const onJob = viewer.role === "OPERATOR" && (await canViewJob(viewer, job._id));
+    if (!onJob) throw new ServiceError("FORBIDDEN", "Only staff or operators who can work on this job can add photos.");
   }
 
   const count = await Photo.countDocuments({ jobId: job._id, kind: input.kind, ...(taskId ? { taskId } : {}) });

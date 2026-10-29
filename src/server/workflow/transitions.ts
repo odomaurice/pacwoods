@@ -5,7 +5,7 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { JobStatusEvent } from "@/server/db/models/JobStatusEvent";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
-import { notifyForJobEvent } from "@/server/services/notifications";
+import { notifyForJobEvent, notifyStageOperators } from "@/server/services/notifications";
 import { ServiceError } from "@/server/services/users";
 
 /**
@@ -87,6 +87,7 @@ export async function queueForCutting(
     { $set: { status: "QUEUED", queueSeq: seq, queuedAt: new Date(), workNumber: job.workNumber } },
     { upsert: true, session },
   );
+  await notifyStageOperators("CUTTING", job.workNumber, session);
   if (job.operations?.edging) {
     await ProductionTask.updateOne(
       { jobId: job._id, stage: "EDGING" },

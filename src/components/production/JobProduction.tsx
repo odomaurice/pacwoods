@@ -1,24 +1,24 @@
 import Link from "next/link";
 import Detail from "@/components/Detail";
-import AssignOperator from "@/components/production/AssignOperator";
+import ReleaseTask from "@/components/production/ReleaseTask";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import ViewButton from "@/components/ViewButton";
 import { STAGE_LABELS, formatDuration } from "@/lib/production";
 import { connectDb } from "@/server/db/connect";
 import { User } from "@/server/db/models/User";
-import { activeMs, listOperatorsFor, tasksForJob } from "@/server/services/production";
+import { activeMs, tasksForJob } from "@/server/services/production";
 import type { Types } from "mongoose";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
 /**
- * The job page's production section: each stage, the operator assigned to it
- * (with their contact details), and how far the work has got.
+ * The job page's production section: each stage, the operator who took it
+ * (with their contact details), and how far the work has got. Operators take
+ * work themselves; staff can only hand it back to the queue.
  */
 export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }) {
   await connectDb();
   const tasks = await tasksForJob(jobId);
-  const [cutters, edgers] = await Promise.all([listOperatorsFor("CUTTING"), listOperatorsFor("EDGING")]);
   const people = await User.find({ _id: { $in: tasks.flatMap(({ task }) => [task.assignedOperatorId, task.completedBy]).filter(Boolean) } })
     .select("name phone email capabilities status")
     .lean();
@@ -33,7 +33,6 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
         <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">This job has no production stages.</p>
       )}
       {tasks.map(({ task, sessions }) => {
-        const pool = (task.stage === "CUTTING" ? cutters : edgers).map((o) => ({ id: o._id.toString(), name: o.name }));
         const open = task.status !== "COMPLETED" && task.status !== "CANCELLED";
         const op = task.assignedOperatorId ? byId.get(task.assignedOperatorId.toString()) : undefined;
         return (
@@ -49,7 +48,7 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
 
             <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
               <div className="rounded-md bg-muted/60 p-4 text-sm">
-                <p className="mb-1 text-muted-foreground">Assigned operator</p>
+                <p className="mb-1 text-muted-foreground">Operator</p>
                 {op ? (
                   <div className="space-y-0.5">
                     <p className="font-semibold">{op.name}</p>
@@ -70,7 +69,7 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
                     </Link>
                   </div>
                 ) : (
-                  <p className="font-medium text-destructive">Not assigned yet</p>
+                  <p className="font-medium">{task.status === "BLOCKED" ? "Not ready yet" : "Not taken yet"}</p>
                 )}
               </div>
               <dl className="grid gap-4 sm:grid-cols-3">
@@ -80,12 +79,7 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
               </dl>
             </div>
 
-            {open && (
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">{op ? "Change operator" : "Assign an operator"}</p>
-                <AssignOperator taskId={task._id.toString()} current={task.assignedOperatorId?.toString()} operators={pool} inProgress={task.status === "IN_PROGRESS"} />
-              </div>
-            )}
+            {open && op && <ReleaseTask taskId={task._id.toString()} operatorName={op.name} inProgress={task.status === "IN_PROGRESS"} />}
           </div>
         );
       })}

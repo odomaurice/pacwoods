@@ -62,10 +62,10 @@ Non-negotiables:
 | Generate / regenerate a cutting plan (before production) | ✔ | ✔ | — | — |
 | Approve a cutlist / plan | ✔ | ✔ | — | — |
 | Revise an approved plan after production starts | ✔ ³ | ◐ ³ | request only | — |
-| Assign and reassign operators | ✔ | ✔ | — | — |
+| Release taken work back to the queue | ✔ | ✔ | — | — |
 | Manage materials, stock sheets, inventory | ✔ | ◐ ⁴ | — | — |
 | System settings (kerf defaults, estimates, etc.) | ✔ | — | — | — |
-| View all jobs and queues | ✔ | ✔ | own queue ⁵ | — |
+| View all jobs and queues | ✔ | ✔ | open work in own stages + own ⁵ | — |
 | Start / pause / resume / complete a stage | — ⁶ | — ⁶ | ✔ eligible task only | — |
 | Report issue / interruption | ✔ | ✔ | ✔ | — |
 | Resolve exceptions (hold, cancel, reassign) | ✔ | ✔ audited | — | — |
@@ -147,10 +147,15 @@ transaction as the task change and the timeline event.
   from an atomic counter, assigned on entering `QUEUED` and never edited.
   Re-queueing after a hold keeps the original `queueSeq` unless an Admin
   explicitly sends it to the back, which is audited.
-- A task may be **pre-assigned** to an operator or left **open**.
+- Nobody assigns work (decided 2026-10-28). Every open task is offered to every
+  operator with the stage capability; the first to **start** it takes it, and it
+  stays theirs (paused included) until completed or an Admin releases it.
+  Taken work is hidden from other operators.
 - Operator *O* may start task *T* only if *T* is the lowest-`queueSeq` `QUEUED`
-  task in that stage that is either assigned to *O* or open, *O* holds the stage
-  capability, *O* is active, and *O* has no other `IN_PROGRESS` task.
+  or `PAUSED` task in that stage that is either taken by *O* or open, *O* holds
+  the stage capability, *O* is active, and *O* has no other `IN_PROGRESS` task.
+  Starting sets the taker in the same conditional update, so two operators
+  pressing Start together cannot both get it.
 - Several operators can work in parallel (one machine each). Each takes the
   head of *their* eligible view of the queue. Whether this matches the floor
   is open (§7).
@@ -382,8 +387,8 @@ server-only or lazy-loaded so they stay out of the main client bundle.
 3. **Edging-only jobs:** allowed? If yes, does the client bring pre-cut parts,
    and who confirms material readiness?
 4. **FIFO scope:** how many workshops/sites? How many cutting machines and
-   edgebanders run in parallel? Is "pre-assign or open claim" (§3) how the floor
-   works?
+   edgebanders run in parallel? (Open claim, oldest first, was chosen on
+   2026-10-28.)
 5. **Release to edging:** automatic on cutting completion, or a manual hand-off
    (parts physically moved)?
 6. **Quality check:** required for every job, some jobs, or none? Who performs it?
@@ -457,17 +462,19 @@ conventional")**, each changeable per job in the Options section:
 
 **Phase 4 (production):** ✔ one task per stage per job, server-issued queue
 tickets ✔ queue rule (`eligibility` in `src/lib/production.ts`): an operator
-works only jobs assigned to them, strictly in ticket order per stage, one job at
-a time; edging waits for cutting ✔ start / pause (reason) / resume / complete
+sees open work in their stages plus their own, takes it by starting it, strictly
+in ticket order per stage, one job at a time; edging waits for cutting ✔ start / pause (reason) / resume / complete
 (panels, waste, defects, downtime, notes) / report issue, all confirmed and
 re-checked in a transaction ✔ concurrency: conditional updates plus a unique
-index allowing one active task per operator ✔ reassignment pauses work in
-progress and keeps its sessions ✔ timeline events ✔ queues page, operator queue,
+index allowing one active task per operator ✔ releasing taken work pauses it
+and keeps its sessions ✔ timeline events ✔ queues page, operator queue,
 task pages, history.
 
 **Decisions (2026-10-26):** machine count unknown, so the conventional set-up:
 one cutting and one edging queue for the workshop, operators working in
-parallel. Admins assign each stage to a specific operator. Job status is set by
+parallel. Admins assign each stage to a specific operator (replaced on
+2026-10-28: operators take open work themselves, oldest first; Admins can only
+release taken work back to the queue). Job status is set by
 the same transaction as each task change rather than derived afterwards. No
 quality-check stage: the last stage completes the job.
 

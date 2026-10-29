@@ -26,13 +26,17 @@ describe.skipIf(!hasDatabase)("issues and dashboard (MongoDB)", () => {
     const c = await provisionClient(root, { name: "C", phone: "+2348050000003" });
     client = { id: c.user._id.toString(), role: "CLIENT" };
     stranger = { id: (await provisionClient(root, { name: "S", phone: "+2348050000004" })).user._id.toString(), role: "CLIENT" };
-    const job = await createJob(root, { clientId: c.profile._id.toString(), cutting: true, edging: false, cuttingOperatorId: op.id });
+    const job = await createJob(root, { clientId: c.profile._id.toString(), cutting: true, edging: false });
     workNumber = job.workNumber;
     taskId = (await ProductionTask.findOne({ jobId: job._id }).lean())!._id.toString();
   });
   afterAll(disconnectTestDb);
 
-  it("lets only the assigned operator report on a task", async () => {
+  it("lets any qualified operator report on open work, and only its operator once taken", async () => {
+    const early = await reportIssueAsOperator(otherOp, taskId, { category: "MATERIAL", description: "Boards look warped" });
+    await Issue.deleteOne({ _id: early._id }); // keep the counts below about the issues they name
+    // As if op had started it (the queue rules are tested elsewhere).
+    await ProductionTask.updateOne({ _id: taskId }, { $set: { assignedOperatorId: op.id } });
     await reportIssueAsOperator(op, taskId, { category: "MACHINE", description: "Saw blade chipping edges" });
     await expect(reportIssueAsOperator(otherOp, taskId, { category: "OTHER", description: "Not mine to report" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(reportIssueAsOperator(op, taskId, { category: "OTHER", description: "x" })).rejects.toMatchObject({ code: "INVALID" });

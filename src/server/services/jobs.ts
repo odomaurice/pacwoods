@@ -11,7 +11,6 @@ import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
-import { notify } from "@/server/services/notifications";
 import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
@@ -34,19 +33,6 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
     throw new ServiceError("CONFLICT", "That client's account is not active.");
   }
 
-  // Operators chosen on the form must be active and have the skill.
-  const pick = async (id: string | undefined, stage: "CUTTING" | "EDGING") => {
-    if (!id) return undefined;
-    if (!mongoose.isValidObjectId(id)) throw new ServiceError("INVALID", "Unknown operator.");
-    const op = await User.findById(id).select("role status capabilities").lean();
-    if (!op || op.role !== "OPERATOR" || op.status !== "ACTIVE" || !op.capabilities.includes(stage)) {
-      throw new ServiceError("INVALID", `That operator cannot do ${stage === "CUTTING" ? "cutting" : "edging"}.`);
-    }
-    return op._id;
-  };
-  const cuttingOperator = await pick(data.cuttingOperatorId, "CUTTING");
-  const edgingOperator = data.edging ? await pick(data.edgingOperatorId, "EDGING") : undefined;
-
   const year = now.getFullYear();
   const job = await mongoose.connection.transaction(async (session) => {
     const seq = await nextSequence(workNumberCounter(year), session);
@@ -67,20 +53,16 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
       { session },
     );
     await recordJobEvent(created._id, { type: "JOB_CREATED", actorId: actor.id, note: "Order registered" }, session);
-    // Production stages exist from the start so operators can be assigned
-    // early; they stay "waiting" until the job enters the queue.
+    // Production stages exist from the start so operators can see the job
+    // coming; they stay "waiting" until the job enters the queue, and the
+    // first operator to start a stage takes it.
     await ProductionTask.create(
       [
-        { jobId: created._id, workNumber: created.workNumber, stage: "CUTTING" as const, status: "BLOCKED" as const, assignedOperatorId: cuttingOperator },
-        ...(data.edging ? [{ jobId: created._id, workNumber: created.workNumber, stage: "EDGING" as const, status: "BLOCKED" as const, assignedOperatorId: edgingOperator }] : []),
+        { jobId: created._id, workNumber: created.workNumber, stage: "CUTTING" as const, status: "BLOCKED" as const },
+        ...(data.edging ? [{ jobId: created._id, workNumber: created.workNumber, stage: "EDGING" as const, status: "BLOCKED" as const }] : []),
       ],
       { session, ordered: true },
     );
-    if (cuttingOperator || edgingOperator) {
-      await recordJobEvent(created._id, { type: "OPERATOR_ASSIGNED", actorId: actor.id, note: "Operators assigned at registration", clientVisible: false }, session);
-      const assigned = [...new Set([cuttingOperator, edgingOperator].filter(Boolean).map(String))];
-      await notify(assigned, { title: `${created.workNumber} is assigned to you`, body: "It will appear in your queue once it is ready to cut.", href: "/operator/queue" }, session);
-    }
     if (data.materialsAvailable) {
       await recordJobEvent(created._id, { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" }, session);
     }

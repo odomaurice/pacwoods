@@ -1,11 +1,12 @@
 import type { DrawPart } from "@/components/cutlist/PlanDrawing";
+import CuttingGuide from "@/components/cutlist/CuttingGuide";
 import PlanViewer from "@/components/cutlist/PlanViewer";
 import Detail from "@/components/Detail";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import { GRAIN_LABELS, describeEdges, estimateMinutes, formatMinutes } from "@/lib/cutlist";
 import { edgingLength } from "@/lib/cutting/engine";
 import { STAGE_LABELS, formatDuration, type Stage, type TaskStatus } from "@/lib/production";
-import { PART_FILLS } from "@/lib/plan-view";
+import { PART_FILLS, guideParts } from "@/lib/plan-view";
 import { estimateAssumptions } from "@/lib/settings";
 import type { CutlistVersionDoc } from "@/server/db/models/CutlistVersion";
 import { getSettings } from "@/server/services/settings";
@@ -24,6 +25,8 @@ export type TaskDetailProps = {
   sessions: Array<{ startedAt: Date; endedAt?: Date | null; endReason?: string | null; note?: string | null }>;
   activeMs: number;
   results?: { quantityCompleted?: number | null; wastePanels?: number | null; defectivePanels?: number | null; downtimeMin?: number | null; notes?: string | null } | null;
+  /** Cutting guide progress; canTick only for the operator working the stage. */
+  guide?: { taskId: string; done: string[]; canTick: boolean };
 };
 
 /** What the operator needs at the machine for one stage of one job. */
@@ -32,7 +35,8 @@ export default async function TaskDetail(p: TaskDetailProps) {
   const cl = p.cutlist;
   const totalPanels = cl?.parts.reduce((n, x) => n + x.quantity, 0) ?? 0;
   const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, { cutting: p.stage === "CUTTING", edging: p.stage === "EDGING" }, assumptions) : null;
-  const banded = cl?.parts.filter((x) => x.edges.length1 || x.edges.length2 || x.edges.width1 || x.edges.width2) ?? [];
+  const numbered = (cl?.parts ?? []).map((x, i) => ({ x, no: i + 1 }));
+  const banded = numbered.filter(({ x }) => x.edges.length1 || x.edges.length2 || x.edges.width1 || x.edges.width2);
   const drawParts: DrawPart[] = (cl?.parts ?? []).map((x, i) => ({ ref: x.ref, label: x.label || `#${i + 1}`, fill: PART_FILLS[i % PART_FILLS.length], edges: x.edges }));
   const stockLabels = Object.fromEntries(
     (cl?.stockSheets ?? []).map((s) => [s.ref, [s.label, s.materialName && `${s.materialName} ${s.thicknessMm} mm`].filter(Boolean).join(" · ") || `${s.length}×${s.width}`]),
@@ -105,9 +109,9 @@ export default async function TaskDetail(p: TaskDetailProps) {
                 </tr>
               </thead>
               <tbody>
-                {(p.stage === "EDGING" ? banded : cl.parts).map((x, i) => (
+                {(p.stage === "EDGING" ? banded : numbered).map(({ x, no }) => (
                   <tr key={x.ref} className="odd:bg-muted/60 [&>td]:px-3 [&>td]:py-2">
-                    <td className="tabular-nums">{i + 1}</td>
+                    <td className="tabular-nums">{no}</td>
                     <td>{x.label || "—"}</td>
                     <td className="text-right tabular-nums">
                       {x.length} × {x.width}
@@ -128,7 +132,24 @@ export default async function TaskDetail(p: TaskDetailProps) {
 
       {p.stage === "CUTTING" && cl?.plan && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Cutting plan</h2>
+          <div>
+            <h2 className="text-lg font-semibold">How to cut it</h2>
+            <p className="text-sm text-muted-foreground">One saw cut at a time, in order: strips off the board first, then each strip into panels.</p>
+          </div>
+          <CuttingGuide
+            sheets={cl.plan.sheets}
+            parts={guideParts(cl.parts)}
+            stockLabels={stockLabels}
+            kerf={cl.options.kerf}
+            edgeTrim={cl.options.edgeTrim}
+            progress={p.guide}
+          />
+        </section>
+      )}
+
+      {p.stage === "CUTTING" && cl?.plan && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Whole plan</h2>
           <PlanViewer sheets={cl.plan.sheets} parts={drawParts} stockLabels={stockLabels} showLabels={cl.options.labelsOnPanels} />
         </section>
       )}
@@ -143,7 +164,7 @@ export default async function TaskDetail(p: TaskDetailProps) {
                 <span className="text-muted-foreground">
                   {" "}
                   · {formatDuration((s.endedAt ?? new Date()).getTime() - s.startedAt.getTime())}
-                  {s.endReason && ` · ${s.endReason === "PAUSE" ? "paused" : s.endReason === "COMPLETE" ? "completed" : "reassigned"}`}
+                  {s.endReason && ` · ${s.endReason === "PAUSE" ? "paused" : s.endReason === "COMPLETE" ? "completed" : "released by staff"}`}
                   {s.note && ` · ${s.note}`}
                 </span>
               </li>

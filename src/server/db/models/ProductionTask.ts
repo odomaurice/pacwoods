@@ -21,6 +21,8 @@ const productionTaskSchema = new Schema(
     firstStartedAt: { type: Date },
     completedAt: { type: Date },
     completedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    /** Cutting guide steps ticked off by the operator ("<sheet>:<cut order>"). A guide, not a gate. */
+    cutsDone: { type: [String], default: [] },
     results: {
       quantityCompleted: { type: Number },
       wastePanels: { type: Number },

@@ -1,5 +1,5 @@
 import "server-only";
-import mongoose, { type ClientSession, type Types } from "mongoose";
+import mongoose, { type ClientSession, type QueryFilter, type Types } from "mongoose";
 import { z } from "zod";
 import { completionSchema, eligibility, type CompletionInput, type QueueItem, type Stage } from "@/lib/production";
 
@@ -9,10 +9,10 @@ import { nextSequence } from "@/server/db/models/Counter";
 import { Job } from "@/server/db/models/Job";
 import { Photo } from "@/server/db/models/Photo";
 import { ProcessingSession } from "@/server/db/models/ProcessingSession";
-import { ProductionTask } from "@/server/db/models/ProductionTask";
+import { ProductionTask, type ProductionTaskDoc } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
-import { notify } from "@/server/services/notifications";
+import { notify, notifyStageOperators } from "@/server/services/notifications";
 import { ServiceError, type Actor } from "@/server/services/users";
 import { recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
@@ -39,72 +39,91 @@ async function assertOperatorCan(operatorId: string | Types.ObjectId, stage: Sta
   return op;
 }
 
-// ── Assignment (staff) ──────────────────────────────────────────────────────
+// ── Who sees what ───────────────────────────────────────────────────────────
+//
+// Nobody assigns work. Every open stage is offered to every operator who can
+// do it; the first to press Start takes it, and from then on it is theirs
+// alone (paused included) until it is finished or staff release it.
 
-/**
- * Assigns (or reassigns) a stage of a job to an operator. Reassigning work in
- * progress pauses it first, so the time already spent stays recorded.
- */
-export async function assignOperator(actor: Actor, taskId: string, operatorId: string) {
-  if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") throw new ServiceError("FORBIDDEN", "Only staff can assign work.");
-  await connectDb();
-  const operator = oid(operatorId);
+const OPEN_STATUSES = ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] as const;
 
-  await mongoose.connection.transaction(async (session) => {
-    const task = await loadTask(taskId, session);
-    if (task.status === "COMPLETED" || task.status === "CANCELLED") throw new ServiceError("CONFLICT", "This work is finished.");
-    const op = await assertOperatorCan(operator, task.stage as Stage, session);
-    if (task.assignedOperatorId?.equals(operator)) return;
-
-    if (task.status === "IN_PROGRESS") {
-      await ProcessingSession.updateOne(
-        { taskId: task._id, endedAt: null },
-        { $set: { endedAt: new Date(), endReason: "REASSIGN" } },
-        { session },
-      );
-      const r = await ProductionTask.updateOne(
-        { _id: task._id, status: "IN_PROGRESS" },
-        { $set: { status: "PAUSED", assignedOperatorId: operator }, $unset: { activeOperatorId: 1 } },
-        { session },
-      );
-      if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The task changed. Reload and try again.");
-    } else {
-      await ProductionTask.updateOne({ _id: task._id }, { $set: { assignedOperatorId: operator } }, { session });
-    }
-    await recordJobEvent(
-      task.jobId,
-      {
-        type: "OPERATOR_ASSIGNED",
-        actorId: actor.id,
-        note: `${STAGE_WORD[task.stage as Stage]} assigned to ${op.name}${task.status === "IN_PROGRESS" ? " (work in progress paused)" : ""}`,
-        clientVisible: false,
-      },
-      session,
-    );
-    await notify([operator], { title: `${STAGE_WORD[task.stage as Stage]} of ${task.workNumber} is assigned to you`, href: `/operator/tasks/${task._id}` }, session);
-  });
-  await audit({ actorId: actor.id, action: "task.assigned", targetType: "ProductionTask", targetId: taskId, meta: { operatorId } });
+/** Open work in the operator's stages that nobody has taken, plus their own. */
+export function visibleFilter(operatorId: Types.ObjectId, capabilities: readonly string[]): QueryFilter<ProductionTaskDoc> {
+  return {
+    status: { $in: [...OPEN_STATUSES] },
+    $or: [{ assignedOperatorId: operatorId }, { assignedOperatorId: null, stage: { $in: capabilities as Stage[] } }],
+  };
 }
 
-// ── Operator actions ────────────────────────────────────────────────────────
+/** The same rule for one task already loaded (completed work stays visible to whoever did it). */
+export function operatorCanSee(task: { stage: string; status: string; assignedOperatorId?: Types.ObjectId | null; completedBy?: Types.ObjectId | null }, operator: { id: string; capabilities: readonly string[] }) {
+  if (task.assignedOperatorId?.toString() === operator.id || task.completedBy?.toString() === operator.id) return true;
+  return !task.assignedOperatorId && (OPEN_STATUSES as readonly string[]).includes(task.status) && operator.capabilities.includes(task.stage);
+}
 
-/** The operator's own open tasks, as the queue rule sees them. */
-async function myQueueItems(operatorId: Types.ObjectId, session?: ClientSession): Promise<QueueItem[]> {
-  const tasks = await ProductionTask.find({
-    assignedOperatorId: operatorId,
-    status: { $in: ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] },
-  })
+/** An operator's capabilities, read fresh from the database. */
+export async function capabilitiesOf(operatorId: string | Types.ObjectId, session?: ClientSession): Promise<string[]> {
+  const op = await User.findById(operatorId).select("role status capabilities").session(session ?? null).lean();
+  return op && op.role === "OPERATOR" && op.status === "ACTIVE" ? [...op.capabilities] : [];
+}
+
+/** The tasks the queue rule considers for this operator. */
+async function visibleQueueItems(operatorId: Types.ObjectId, capabilities: readonly string[], session?: ClientSession): Promise<QueueItem[]> {
+  const tasks = await ProductionTask.find(visibleFilter(operatorId, capabilities))
     .select("workNumber status queueSeq stage")
     .session(session ?? null)
     .lean();
   return tasks.map((t) => ({ id: t._id.toString(), workNumber: t.workNumber, status: t.status, queueSeq: t.queueSeq ?? null, stage: t.stage }));
 }
 
+// ── Release (staff) ─────────────────────────────────────────────────────────
+
 /**
- * Starts (or resumes) a task. Server-side checks, inside one transaction:
- * the operator is active and qualified, the task is theirs, it is the next
- * one in their queue, and they have nothing else in progress. The status
- * change is conditional, and the database refuses a second active task.
+ * Hands a taken stage back to the shared queue, for when its operator cannot
+ * carry on. Work in progress is paused first, so the time spent stays
+ * recorded; the stage keeps its place in the queue.
+ */
+export async function releaseTask(actor: Actor, taskId: string) {
+  if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") throw new ServiceError("FORBIDDEN", "Only staff can release work.");
+  await connectDb();
+
+  await mongoose.connection.transaction(async (session) => {
+    const task = await loadTask(taskId, session);
+    if (task.status === "COMPLETED" || task.status === "CANCELLED") throw new ServiceError("CONFLICT", "This work is finished.");
+    if (!task.assignedOperatorId) throw new ServiceError("CONFLICT", "Nobody has taken this work.");
+    const previous = await User.findById(task.assignedOperatorId).select("name").session(session).lean();
+
+    if (task.status === "IN_PROGRESS") {
+      await ProcessingSession.updateOne({ taskId: task._id, endedAt: null }, { $set: { endedAt: new Date(), endReason: "REASSIGN" } }, { session });
+    }
+    const r = await ProductionTask.updateOne(
+      { _id: task._id, status: task.status, assignedOperatorId: task.assignedOperatorId },
+      { $set: task.status === "IN_PROGRESS" ? { status: "PAUSED" } : {}, $unset: { assignedOperatorId: 1, activeOperatorId: 1 } },
+      { session },
+    );
+    if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The task changed. Reload and try again.");
+
+    const word = STAGE_WORD[task.stage as Stage];
+    await recordJobEvent(
+      task.jobId,
+      { type: "TASK_RELEASED", actorId: actor.id, note: `${word} released from ${previous?.name ?? "its operator"}${task.status === "IN_PROGRESS" ? " (work in progress paused)" : ""}`, clientVisible: false },
+      session,
+    );
+    await notify([task.assignedOperatorId], { title: `${word} of ${task.workNumber} was handed back to the queue`, href: "/operator/queue" }, session);
+    if (task.status !== "BLOCKED") await notifyStageOperators(task.stage as Stage, task.workNumber, session, task.assignedOperatorId);
+  });
+  await audit({ actorId: actor.id, action: "task.released", targetType: "ProductionTask", targetId: taskId });
+}
+
+// ── Operator actions ────────────────────────────────────────────────────────
+
+/**
+ * Starts (or resumes) a task, taking it if nobody has. Server-side checks,
+ * inside one transaction: the operator is active and qualified, nobody else
+ * has taken it, it is the oldest ready work in that queue, and they have
+ * nothing else in progress. The update is conditional on nobody having taken
+ * it, so two operators pressing Start together cannot both get it; the
+ * database also refuses a second active task for one operator.
  */
 export async function startTask(operator: Operator, taskId: string) {
   if (operator.role !== "OPERATOR") throw new ServiceError("FORBIDDEN", "Only operators record production work.");
@@ -114,20 +133,20 @@ export async function startTask(operator: Operator, taskId: string) {
   try {
     await mongoose.connection.transaction(async (session) => {
       const task = await loadTask(taskId, session);
-      if (!task.assignedOperatorId?.equals(me)) throw new ServiceError("FORBIDDEN", "This work is not assigned to you.");
-      await assertOperatorCan(me, task.stage as Stage, session);
+      if (task.assignedOperatorId && !task.assignedOperatorId.equals(me)) throw new ServiceError("CONFLICT", "Another operator has already taken this work.");
+      const op = await assertOperatorCan(me, task.stage as Stage, session);
 
-      const rule = eligibility(await myQueueItems(me, session)).get(task._id.toString());
+      const rule = eligibility(await visibleQueueItems(me, op.capabilities, session)).get(task._id.toString());
       if (!rule?.canStart) throw new ServiceError("CONFLICT", rule?.reason ?? "This work cannot be started now.");
 
       const resuming = task.status === "PAUSED";
       const now = new Date();
       const r = await ProductionTask.updateOne(
-        { _id: task._id, status: task.status, assignedOperatorId: me },
-        { $set: { status: "IN_PROGRESS", activeOperatorId: me, ...(task.firstStartedAt ? {} : { firstStartedAt: now }) } },
+        { _id: task._id, status: task.status, $or: [{ assignedOperatorId: null }, { assignedOperatorId: me }] },
+        { $set: { status: "IN_PROGRESS", assignedOperatorId: me, activeOperatorId: me, ...(task.firstStartedAt ? {} : { firstStartedAt: now }) } },
         { session },
       );
-      if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "Someone else changed this work. Reload and try again.");
+      if (r.modifiedCount !== 1) throw new ServiceError("CONFLICT", "Another operator took this work first. Reload to see what is next.");
       await ProcessingSession.create([{ taskId: task._id, jobId: task.jobId, operatorId: me, startedAt: now }], { session });
 
       const word = STAGE_WORD[task.stage as Stage];
@@ -212,6 +231,7 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
         { session },
       );
       if (released.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The edging stage for this job is missing.");
+      await notifyStageOperators("EDGING", task.workNumber, session);
       await transitionJob(job._id, "CUTTING_IN_PROGRESS", "QUEUED_FOR_EDGING", event, session);
     } else {
       const from = task.stage === "CUTTING" ? "CUTTING_IN_PROGRESS" : "EDGING_IN_PROGRESS";
@@ -221,6 +241,23 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
   });
 }
 
+const CUT_KEY = /^\d{1,4}:\d{1,5}$/;
+
+/**
+ * Ticks a cutting guide step off (or back on). Only the operator working the
+ * stage, while it is in progress; it never blocks completion.
+ */
+export async function markCut(operator: Operator, taskId: string, key: string, done: boolean) {
+  if (operator.role !== "OPERATOR") throw new ServiceError("FORBIDDEN", "Only operators tick cuts off.");
+  if (!CUT_KEY.test(key)) throw new ServiceError("INVALID", "Unknown cut.");
+  await connectDb();
+  const r = await ProductionTask.updateOne(
+    { _id: oid(taskId), stage: "CUTTING", status: "IN_PROGRESS", activeOperatorId: oid(operator.id) },
+    done ? { $addToSet: { cutsDone: key } } : { $pull: { cutsDone: key } },
+  );
+  if (r.matchedCount !== 1) throw new ServiceError("CONFLICT", "Start or resume this job to tick cuts off.");
+}
+
 // ── Reading ─────────────────────────────────────────────────────────────────
 
 /** Active time from sessions; an open session counts up to now. */
@@ -228,11 +265,12 @@ export function activeMs(sessions: Array<{ startedAt: Date; endedAt?: Date | nul
   return sessions.reduce((ms, s) => ms + ((s.endedAt ?? now).getTime() - s.startedAt.getTime()), 0);
 }
 
+/** Everything this operator may take or is working on, oldest first. */
 export async function operatorQueue(operatorId: string) {
   await connectDb();
   const me = oid(operatorId);
-  const tasks = await ProductionTask.find({ assignedOperatorId: me, status: { $in: ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] } })
-    .sort({ queueSeq: 1 })
+  const tasks = await ProductionTask.find(visibleFilter(me, await capabilitiesOf(me)))
+    .sort({ queueSeq: 1, createdAt: 1 })
     .lean();
   const items = tasks.map((t) => ({ id: t._id.toString(), workNumber: t.workNumber, status: t.status, queueSeq: t.queueSeq ?? null, stage: t.stage }));
   const rules = eligibility(items);
@@ -253,11 +291,6 @@ export async function listStageQueue(stage: Stage) {
   return tasks.map((t) => ({ task: t, operatorName: t.assignedOperatorId ? name.get(t.assignedOperatorId.toString()) : undefined }));
 }
 
-export async function listOperatorsFor(stage: Stage) {
-  await connectDb();
-  return User.find({ role: "OPERATOR", status: "ACTIVE", capabilities: stage }).select("name").sort({ name: 1 }).lean();
-}
-
 export async function tasksForJob(jobId: Types.ObjectId) {
   const tasks = await ProductionTask.find({ jobId }).sort({ stage: 1 }).lean();
   const sessions = await ProcessingSession.find({ taskId: { $in: tasks.map((t) => t._id) } }).sort({ startedAt: 1 }).lean();
@@ -273,17 +306,19 @@ export async function operatorHistory(operatorId: string) {
 }
 
 /**
- * A task with everything its page shows. Operators may only open tasks
- * assigned to them (or that they completed); staff may open any.
+ * A task with everything its page shows. Operators may open open work in
+ * their stages that nobody else has taken, their own, and what they
+ * completed; staff may open any.
  */
 export async function getTaskForViewer(viewer: { id: string; role: string }, taskId: string) {
   if (!mongoose.isValidObjectId(taskId)) return null;
   await connectDb();
   const task = await ProductionTask.findById(taskId).lean();
   if (!task) return null;
+  let capabilities: string[] = [];
   if (viewer.role === "OPERATOR") {
-    const mine = task.assignedOperatorId?.toString() === viewer.id || task.completedBy?.toString() === viewer.id;
-    if (!mine) return null;
+    capabilities = await capabilitiesOf(viewer.id);
+    if (!operatorCanSee(task, { id: viewer.id, capabilities })) return null;
   } else if (viewer.role !== "SUPER_ADMIN" && viewer.role !== "ADMIN") {
     return null;
   }
@@ -291,8 +326,8 @@ export async function getTaskForViewer(viewer: { id: string; role: string }, tas
   if (!job) return null;
   const sessions = await ProcessingSession.find({ taskId: task._id }).sort({ startedAt: 1 }).lean();
   const rule =
-    viewer.role === "OPERATOR" && task.assignedOperatorId?.toString() === viewer.id
-      ? eligibility(await myQueueItems(new mongoose.Types.ObjectId(viewer.id))).get(task._id.toString())
+    viewer.role === "OPERATOR" && task.status !== "COMPLETED"
+      ? eligibility(await visibleQueueItems(new mongoose.Types.ObjectId(viewer.id), capabilities)).get(task._id.toString())
       : undefined;
   return { task, job, sessions, rule };
 }

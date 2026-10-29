@@ -26,10 +26,10 @@ export default async function OperatorQueue() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="My queue" description="Your assigned jobs, in order. Only the next job in each queue can be started." />
+      <PageHeader title="My queue" description="Every job you can work on, oldest first. Start the next one to take it; jobs another operator has taken are not shown." />
 
       {cards.length === 0 ? (
-        <EmptyState title="No work is assigned to you." />
+        <EmptyState title="There is no work for you right now." />
       ) : (
         STAGES.filter((stage) => user.capabilities.includes(stage) || cards.some((r) => r.task.stage === stage)).map((stage) => {
           const list = cards.filter((r) => r.task.stage === stage).sort((a, b) => Number(b.task.status === "IN_PROGRESS") - Number(a.task.status === "IN_PROGRESS"));
@@ -39,7 +39,7 @@ export default async function OperatorQueue() {
                 {STAGE_LABELS[stage]} queue <span className="font-normal text-muted-foreground">· {list.length}</span>
               </h2>
               {list.length === 0 ? (
-                <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} assigned to you.`} />
+                <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} waiting.`} />
               ) : (
                 <ol className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                   {list.map(({ task, rule, card }, i) => {
@@ -51,6 +51,7 @@ export default async function OperatorQueue() {
                         </span>
                         <TaskStatusBadge status={task.status} />
                         {task.status === "IN_PROGRESS" && <span className="text-xs font-semibold tracking-wide text-brand-gold uppercase">Working now</span>}
+                        {task.status === "PAUSED" && task.assignedOperatorId && <span className="text-xs font-semibold tracking-wide text-brand-gold uppercase">Yours</span>}
                       </div>
                     );
                     const actions = (

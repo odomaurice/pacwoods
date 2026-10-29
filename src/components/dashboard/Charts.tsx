@@ -168,7 +168,7 @@ export function WorkloadChart({ data }: { data: Array<{ id: string; name: string
       table={<SimpleTable head={["Operator", "Cutting", "Edging"]} rows={data.map((d) => [d.name, d.cutting, d.edging])} />}
     >
       {data.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">No work is assigned to anyone.</p>
+        <p className="py-16 text-center text-sm text-muted-foreground">No operator has taken any work yet.</p>
       ) : (
         <div style={{ height }}>
           <ResponsiveContainer width="100%" height="100%">

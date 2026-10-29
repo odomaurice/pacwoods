@@ -6,7 +6,7 @@ import { approveCutlist, generatePlan } from "@/server/services/cutlists";
 import { reportIssueAsClient, resolveIssue } from "@/server/services/issues";
 import { createJob } from "@/server/services/jobs";
 import { markAllRead, unreadCount } from "@/server/services/notifications";
-import { assignOperator, completeTask, startTask } from "@/server/services/production";
+import { completeTask, startTask } from "@/server/services/production";
 import { bootstrapSuperAdmin, provisionAccount, provisionClient, type Actor } from "@/server/services/users";
 import { addFinishedPhoto, connectTestDb, disconnectTestDb, hasDatabase } from "./setup";
 
@@ -37,8 +37,7 @@ describe.skipIf(!hasDatabase)("notifications (MongoDB)", () => {
     });
     await approveCutlist(root, job.workNumber);
     const task = (await ProductionTask.findOne({ jobId: job._id }).lean())!._id.toString();
-    await assignOperator(root, task, op.id);
-    expect(await titles(op.id)).toEqual([`Cutting of ${job.workNumber} is assigned to you`]);
+    expect(await titles(op.id)).toEqual([`${job.workNumber} is ready for cutting`]);
 
     await startTask(op, task);
     await addFinishedPhoto(task, op.id);

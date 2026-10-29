@@ -34,7 +34,7 @@ describe.skipIf(!hasDatabase)("photos (MongoDB)", () => {
     const c = await provisionClient(root, { name: "C", phone: "+2348020000103" });
     client = { id: c.user._id.toString(), role: "CLIENT" };
     stranger = { id: (await provisionClient(root, { name: "S", phone: "+2348020000104" })).user._id.toString(), role: "CLIENT" };
-    const job = await createJob(root, { clientId: c.profile._id.toString(), cutting: true, edging: false, materialsAvailable: true, cuttingOperatorId: op.id });
+    const job = await createJob(root, { clientId: c.profile._id.toString(), cutting: true, edging: false, materialsAvailable: true });
     await generatePlan(root, job.workNumber, {
       parts: [{ ref: "P1", length: 600, width: 400, quantity: 2, grain: "NONE", edges: NO_EDGES }],
       stockSheets: [{ ref: "S1", length: 2440, width: 1220, quantity: 2, grained: false }],
@@ -43,6 +43,8 @@ describe.skipIf(!hasDatabase)("photos (MongoDB)", () => {
     await approveCutlist(root, job.workNumber);
     workNumber = job.workNumber;
     taskId = (await ProductionTask.findOne({ jobId: job._id }).lean())!._id.toString();
+    // As if op had taken it; otherOp (same skill) then no longer sees the job.
+    await ProductionTask.updateOne({ _id: taskId }, { $set: { assignedOperatorId: op.id } });
   });
   afterAll(disconnectTestDb);
 

@@ -52,7 +52,7 @@ describe.skipIf(!hasDatabase)("exports and reports (MongoDB)", () => {
   });
 
   it("reports completed work and board used in the period", async () => {
-    const job = await createJob(root, { clientId: client.profileId, cutting: true, edging: false, materialsAvailable: true, cuttingOperatorId: op.id });
+    const job = await createJob(root, { clientId: client.profileId, cutting: true, edging: false, materialsAvailable: true });
     await generatePlan(root, job.workNumber, input);
     await approveCutlist(root, job.workNumber);
     const task = (await ProductionTask.findOne({ jobId: job._id }).lean())!._id.toString();

@@ -23,7 +23,7 @@ export default async function AdminOverview() {
           { label: "Active jobs", value: d.kpis.active, href: "/admin/jobs" },
           { label: "In production", value: d.kpis.inProduction, href: "/admin/queues" },
           { label: "Waiting in queues", value: d.kpis.waitingInQueues, href: "/admin/queues" },
-          { label: "Needs an operator", value: d.kpis.unassigned, href: "/admin/queues", alert: true },
+          { label: "Waiting to be taken", value: d.kpis.unassigned, href: "/admin/queues" },
           { label: "Open issues", value: d.kpis.openIssues, href: "/admin/issues", alert: true },
           { label: "Completed, 30 days", value: d.kpis.completed30, href: "/admin/jobs?status=COMPLETED" },
         ]}

@@ -16,7 +16,7 @@ export default async function QueuesPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Production queues" description="First come, first served. Each operator works their assigned jobs in this order." />
+      <PageHeader title="Production queues" description="First come, first served. Operators take the oldest ready job first." />
       {queues.map(({ stage, rows }) => {
         const waiting = rows.filter((r) => r.task.status !== "BLOCKED");
         const upcoming = rows.filter((r) => r.task.status === "BLOCKED");
@@ -46,7 +46,7 @@ export default async function QueuesPage() {
                       <TableRow key={task._id.toString()}>
                         <TableCell className="tabular-nums">#{task.queueSeq}</TableCell>
                         <TableCell className="font-mono">{task.workNumber}</TableCell>
-                        <TableCell>{operatorName ?? <span className="font-medium text-destructive">Needs assignment</span>}</TableCell>
+                        <TableCell>{operatorName ?? <span className="text-muted-foreground">Not taken yet</span>}</TableCell>
                         <TableCell>
                           <TaskStatusBadge status={task.status} />
                         </TableCell>

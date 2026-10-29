@@ -5,6 +5,7 @@ import { STAGE_LABELS, type Stage } from "@/lib/production";
 import { connectDb } from "@/server/db/connect";
 import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
+import { capabilitiesOf, operatorCanSee } from "@/server/services/production";
 import { User } from "@/server/db/models/User";
 import { listPhotos } from "@/server/services/photos";
 
@@ -22,7 +23,7 @@ export default async function JobPhotos({ jobId, viewer, title = "Photos" }: { j
   const [job, photos, tasks] = await Promise.all([
     Job.findById(jobId).select("workNumber status").lean(),
     listPhotos(jobId),
-    ProductionTask.find({ jobId }).select("stage status assignedOperatorId").lean(),
+    ProductionTask.find({ jobId }).select("stage status assignedOperatorId completedBy").lean(),
   ]);
   if (!job) return null;
   const people = await User.find({ _id: { $in: photos.map((p) => p.uploadedBy) } }).select("name").lean();
@@ -30,7 +31,8 @@ export default async function JobPhotos({ jobId, viewer, title = "Photos" }: { j
 
   const staff = viewer.role === "SUPER_ADMIN" || viewer.role === "ADMIN";
   const open = job.status !== "COMPLETED" && job.status !== "CANCELLED";
-  const onJob = tasks.some((t) => t.assignedOperatorId?.toString() === viewer.id);
+  const capabilities = viewer.role === "OPERATOR" ? await capabilitiesOf(viewer.id) : [];
+  const onJob = viewer.role === "OPERATOR" && tasks.some((t) => operatorCanSee(t, { id: viewer.id, capabilities }));
   const taskOpen = (t: (typeof tasks)[number]) => t.status !== "COMPLETED" && t.status !== "CANCELLED";
 
   const grid = (list: typeof photos): GridPhoto[] =>

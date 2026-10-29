@@ -82,8 +82,8 @@ export default async function OperatorOverview() {
             </div>
           </JobSummaryCard>
         ) : (
-          <EmptyState title={queue.length ? "Nothing can be started right now." : "No work is assigned to you."}>
-            {queue.length > 0 && "Your assigned jobs are waiting for cutting, materials or approval. See My queue for details."}
+          <EmptyState title={queue.length ? "Nothing can be started right now." : "There is no work for you right now."}>
+            {queue.length > 0 && "The jobs in your queues are waiting for cutting, materials or approval. See My queue for details."}
           </EmptyState>
         )}
       </section>

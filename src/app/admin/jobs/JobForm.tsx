@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadPhoto } from "@/lib/image-resize";
 import UploadPreviews, { type UploadState } from "@/components/photos/UploadPreviews";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createJobAction, updateJobAction } from "@/actions/jobs";
 import FormField from "@/components/FormField";
@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { jobSchema, type JobInput } from "@/lib/schemas";
 
 type ClientOption = { id: string; label: string };
-type OperatorOption = { id: string; name: string };
 
 /**
  * Creates a job (with a client picker) or edits a draft's details. The work
@@ -27,12 +26,8 @@ export default function JobForm({
   clients,
   defaultClientId,
   existing,
-  cuttingOperators = [],
-  edgingOperators = [],
 }: {
   clients?: ClientOption[];
-  cuttingOperators?: OperatorOption[];
-  edgingOperators?: OperatorOption[];
   defaultClientId?: string;
   /** Editing a draft: the client cannot change, so it rides along unseen. */
   existing?: { workNumber: string; values: JobInput };
@@ -47,16 +42,13 @@ export default function JobForm({
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors },
   } = useForm<JobInput>({
     resolver: zodResolver(jobSchema),
     defaultValues: existing
       ? existing.values
-      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, cuttingOperatorId: "", edgingOperatorId: "", title: "", clientNotes: "", internalNotes: "" },
+      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "" },
   });
-
-  const edging = useWatch({ control, name: "edging" });
 
   const onSubmit = handleSubmit((values) => {
     setServerError(undefined);
@@ -67,12 +59,7 @@ export default function JobForm({
         if (result && !result.ok) setServerError(result.error);
         return;
       }
-      const result = await createJobAction({
-        ...details,
-        clientId,
-        cuttingOperatorId: details.cuttingOperatorId || undefined,
-        edgingOperatorId: details.edging ? details.edgingOperatorId || undefined : undefined,
-      });
+      const result = await createJobAction({ ...details, clientId });
       if (!result.ok) {
         setServerError(result.error);
         return;
@@ -134,18 +121,6 @@ export default function JobForm({
         </label>
         {errors.cutting && <p className="text-sm text-destructive">{errors.cutting.message}</p>}
       </fieldset>
-
-      {!editing && (
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">Operators (optional, can be set later)</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <OperatorSelect id="cuttingOperatorId" label="Cutting operator" options={cuttingOperators} register={register("cuttingOperatorId")} />
-            {edging && (
-              <OperatorSelect id="edgingOperatorId" label="Edging operator" options={edgingOperators} register={register("edgingOperatorId")} />
-            )}
-          </div>
-        </fieldset>
-      )}
 
       {!editing && (
         <div className="space-y-2">
@@ -214,31 +189,5 @@ export default function JobForm({
         </Link>
       </div>
     </form>
-  );
-}
-
-function OperatorSelect({
-  id,
-  label,
-  options,
-  register,
-}: {
-  id: string;
-  label: string;
-  options: OperatorOption[];
-  register: ReturnType<ReturnType<typeof useForm<JobInput>>["register"]>;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <select id={id} className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register}>
-        <option value="">{options.length ? "Assign later" : "No operators with this skill yet"}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }

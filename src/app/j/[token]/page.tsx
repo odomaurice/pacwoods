@@ -4,6 +4,7 @@ import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
+import { capabilitiesOf, operatorCanSee } from "@/server/services/production";
 
 /**
  * Where a scanned job QR code lands. The token is opaque; the job is only
@@ -28,8 +29,12 @@ export default async function ScanPage({ params }: PageProps<"/j/[token]">) {
       redirect(`/client/jobs/${job.workNumber}`);
     }
     case "OPERATOR": {
-      // Straight to this job if it is assigned to them; otherwise their queue.
-      const task = await ProductionTask.findOne({ jobId: job._id, assignedOperatorId: user.id }).sort({ status: 1 }).select("_id").lean();
+      // Straight to the stage they are on or can take; otherwise their queue.
+      const capabilities = await capabilitiesOf(user.id);
+      const tasks = await ProductionTask.find({ jobId: job._id }).sort({ stage: 1 }).select("stage status assignedOperatorId completedBy").lean();
+      const open = (t: (typeof tasks)[number]) => t.status !== "COMPLETED" && t.status !== "CANCELLED";
+      const visible = tasks.filter((t) => operatorCanSee(t, { id: user.id, capabilities }));
+      const task = visible.find((t) => open(t) && t.assignedOperatorId?.toString() === user.id) ?? visible.find(open) ?? visible[0];
       redirect(task ? `/operator/tasks/${task._id}` : "/operator/queue");
     }
   }

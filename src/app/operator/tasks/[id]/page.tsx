@@ -18,11 +18,12 @@ export const metadata: Metadata = { title: "Job | Pacwoods" };
 export default async function OperatorTaskPage({ params }: PageProps<"/operator/tasks/[id]">) {
   const user = await requireRole("OPERATOR");
   const { id } = await params;
-  // Not assigned to this operator: it does not exist for them.
+  // Taken by another operator: it does not exist for this one.
   const view = await loadTaskView(user, id);
   if (!view) notFound();
   const { task, job, rule, props, totalPanels } = view;
-  const mine = task.assignedOperatorId?.toString() === user.id;
+  // Theirs, or open and nobody's yet (starting it takes it).
+  const canAct = !task.assignedOperatorId || task.assignedOperatorId.toString() === user.id;
   const card = await getJobCardData(task.workNumber);
   const finishedPhotos = await Photo.countDocuments({ taskId: task._id, kind: "FINISHED" });
 
@@ -45,7 +46,7 @@ export default async function OperatorTaskPage({ params }: PageProps<"/operator/
           <JobSummaryCard data={card.data} scanUrl={await scanUrl(card.qrToken)} />
         </div>
       )}
-      {mine && task.status !== "COMPLETED" && (
+      {canAct && task.status !== "COMPLETED" && (
         <div className="mb-6 rounded-lg bg-card p-5">
           <TaskActions
             taskId={task._id.toString()}

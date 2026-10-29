@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/server/auth/guards";
 import {
-  assignOperator,
   completeTask,
+  markCut,
   pauseTask,
+  releaseTask,
   startTask,
   type CompletionInput,
 } from "@/server/services/production";
@@ -25,9 +26,9 @@ async function run(fn: () => Promise<unknown>): Promise<ProductionResult> {
   return { ok: true };
 }
 
-export async function assignOperatorAction(taskId: string, operatorId: string): Promise<ProductionResult> {
+export async function releaseTaskAction(taskId: string): Promise<ProductionResult> {
   const user = await requireRole("SUPER_ADMIN", "ADMIN");
-  return run(() => assignOperator({ id: user.id, role: user.role, permissions: user.permissions }, taskId, operatorId));
+  return run(() => releaseTask({ id: user.id, role: user.role, permissions: user.permissions }, taskId));
 }
 
 async function operator() {
@@ -48,4 +49,16 @@ export async function pauseTaskAction(taskId: string, reason: string): Promise<P
 export async function completeTaskAction(taskId: string, input: CompletionInput): Promise<ProductionResult> {
   const me = await operator();
   return run(() => completeTask(me, taskId, input));
+}
+
+/** Ticking a cut is frequent and only this operator sees it live, so nothing is revalidated. */
+export async function markCutAction(taskId: string, key: string, done: boolean): Promise<ProductionResult> {
+  const me = await operator();
+  try {
+    await markCut(me, taskId, key, done);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ServiceError) return { ok: false, error: error.message };
+    throw error;
+  }
 }
