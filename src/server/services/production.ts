@@ -222,6 +222,15 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
 
     const word = STAGE_WORD[task.stage as Stage];
     const event = { type: `${task.stage}_COMPLETED`, actorId: operator.id, note: `${word} completed · ${results.quantityCompleted} panels` };
+    const [doer, staff] = await Promise.all([
+      User.findById(me).select("name").session(session).lean(),
+      User.find({ role: { $in: ["SUPER_ADMIN", "ADMIN"] }, status: "ACTIVE" }).select("_id").session(session).lean(),
+    ]);
+    await notify(
+      staff.map((s) => s._id),
+      { title: `${word} of ${task.workNumber} is done. Has ${doer?.name ?? "the operator"} been paid?`, body: "Record operator pay on the job's Payments section.", href: `/admin/jobs/${task.workNumber}#payments` },
+      session,
+    );
 
     if (task.stage === "CUTTING" && job.operations?.edging) {
       const seq = await nextSequence("queue:edging", session);

@@ -10,6 +10,7 @@ import { Photo } from "../src/server/db/models/Photo";
 import { JobStatusEvent } from "../src/server/db/models/JobStatusEvent";
 import { Notification } from "../src/server/db/models/Notification";
 import { PasswordResetToken } from "../src/server/db/models/PasswordResetToken";
+import { Payment } from "../src/server/db/models/Payment";
 import { SystemSetting } from "../src/server/db/models/SystemSetting";
 import { ProcessingSession } from "../src/server/db/models/ProcessingSession";
 import { ProductionTask } from "../src/server/db/models/ProductionTask";
@@ -19,7 +20,7 @@ import { User } from "../src/server/db/models/User";
 
 async function main() {
   await connectDb();
-  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue, Photo, Notification, SystemSetting, PasswordResetToken]) {
+  for (const model of [User, AuditLog, AuthThrottle, ClientProfile, Material, Job, CutlistVersion, JobStatusEvent, ProductionTask, ProcessingSession, Issue, Photo, Notification, SystemSetting, PasswordResetToken, Payment]) {
     await model.syncIndexes();
     console.log(`indexes synced: ${model.collection.collectionName}`);
   }

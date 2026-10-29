@@ -9,9 +9,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CURRENCIES } from "@/lib/payments";
 import { TIME_ZONES, settingsSchema, type Settings } from "@/lib/settings";
 
-type NumberKey = Exclude<keyof Settings, "timeZone">;
+type NumberKey = Exclude<keyof Settings, "timeZone" | "currency">;
 
 const GROUPS: Array<{ title: string; text: string; fields: Array<{ key: NumberKey; label: string; unit: string; hint: string; step?: string }> }> = [
   {
@@ -93,6 +94,20 @@ export default function SettingsForm({ initial }: { initial: Settings }) {
           {TIME_ZONES.map((z) => (
             <option key={z} value={z}>
               {z.replace("_", " ")}
+            </option>
+          ))}
+        </select>
+      </section>
+      <section className="space-y-3 rounded-lg bg-card p-5">
+        <div>
+          <h2 className="font-semibold">Currency</h2>
+          <p className="text-sm text-muted-foreground">Shown on recorded payments. Until you choose, amounts appear as plain numbers.</p>
+        </div>
+        <select className="h-11 rounded-md border border-input bg-card px-3 text-sm" aria-label="Currency" {...register("currency")}>
+          <option value="">Not chosen yet</option>
+          {CURRENCIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
             </option>
           ))}
         </select>

@@ -34,6 +34,9 @@ export default async function ClientPage({ params }: PageProps<"/admin/clients/[
         description={<span className="font-mono">{profile.clientNumber}</span>}
         actions={
           <>
+            <Link href={`/admin/payments?client=${id}`} className={buttonVariants({ variant: "outline" })}>
+              Payments
+            </Link>
             <Link href={`/admin/clients/${id}/card`} className={buttonVariants({ variant: "outline" })}>
               Print client card
             </Link>

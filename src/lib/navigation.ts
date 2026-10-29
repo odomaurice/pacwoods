@@ -9,6 +9,7 @@ import {
   IdentityCardIcon,
   Notification01Icon,
   Layers01Icon,
+  Money03Icon,
   Note01Icon,
   Task01Icon,
   UserGroupIcon,
@@ -60,12 +61,19 @@ function baseNavigation(user: { role: Role; permissions: readonly Permission[] }
           title: "Oversight",
           items: [
             { href: "/admin/reports", label: "Reports", icon: ChartIcon },
+            { href: "/admin/payments", label: "Payments", icon: Money03Icon },
             { href: "/admin/audit", label: "Audit log", icon: Note01Icon },
             { href: "/admin/settings", label: "Settings", icon: Settings02Icon },
           ],
         });
       } else {
-        sections.push({ title: "Oversight", items: [{ href: "/admin/reports", label: "Reports", icon: ChartIcon }] });
+        sections.push({
+          title: "Oversight",
+          items: [
+            { href: "/admin/reports", label: "Reports", icon: ChartIcon },
+            { href: "/admin/payments", label: "Payments", icon: Money03Icon },
+          ],
+        });
       }
       return sections;
     }

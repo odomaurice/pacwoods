@@ -6,6 +6,7 @@ import AccountActions from "@/components/AccountActions";
 import Detail from "@/components/Detail";
 import PageHeader from "@/components/PageHeader";
 import { AccountStatusBadge } from "@/components/StatusBadge";
+import { buttonVariants } from "@/components/ui/button";
 import { ROLE_LABELS, canProvision } from "@/lib/roles";
 import { requireRole } from "@/server/auth/guards";
 import { connectDb } from "@/server/db/connect";
@@ -39,7 +40,17 @@ export default async function AccountPage({ params }: PageProps<"/admin/accounts
       <Link href={back.href} className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
         ← {back.label}
       </Link>
-      <PageHeader title={user.name} description={ROLE_LABELS[user.role]} />
+      <PageHeader
+        title={user.name}
+        description={ROLE_LABELS[user.role]}
+        actions={
+          user.role === "OPERATOR" && (
+            <Link href={`/admin/payments?operator=${user._id}&view=operators`} className={buttonVariants({ variant: "outline" })}>
+              Pay for completed work
+            </Link>
+          )
+        }
+      />
 
       <dl className="mb-8 grid gap-4 rounded-lg bg-card p-5 sm:grid-cols-2 lg:grid-cols-3">
         <Detail label="Status">

@@ -413,8 +413,9 @@ server-only or lazy-loaded so they stay out of the main client bundle.
     to consumed stock?
 15. **Admins recording work for operators:** ever allowed (e.g. operator
     without a device)?
-16. **Locale:** time zone, currency for material costs, phone-number country
-    default.
+16. **Locale:** time zone, currency for material costs and recorded payments,
+    phone-number country default. Currency is a Settings choice (Super Admin);
+    until it is chosen, amounts show without a symbol.
 17. **Retention:** how long are completed jobs, audit logs and client data kept?
 18. **Work numbers:** does the sequence restart each year (`PAC-2027-000001`)?
     Proposed: yes.
@@ -503,3 +504,14 @@ devices ☐ load/concurrency test on Atlas ☐ deployment, backup and restore do
 
 Every phase ends with lint, build, the test suite, and a short report of what
 changed, test results, and known limitations.
+
+**Payments (2026-10-29):** money changes hands outside Pacwoods; staff record
+it. The new-job form asks whether the client has paid (not yet / part / in
+full); more client payments are recorded on the job. Completing a stage asks
+staff whether that stage's operator has been paid, recorded once per operator
+per stage. Each record is a ledger entry with an optional amount (minor units),
+method, date and note; mistakes are voided with a reason, never edited.
+`/admin/payments` collects them by job, by operator and as a ledger, filterable
+by client or operator. Job prices and operator pay rates are not stored: there
+is nothing to compare payments against, so "part" or "full" is the admin's
+statement, not a calculation.

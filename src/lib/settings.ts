@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_OPTIONS, ESTIMATE_ASSUMPTIONS } from "@/lib/cutlist";
+import { CURRENCIES } from "@/lib/payments";
 
 /** Common time zones; the workshop's local time is used for greetings and dates. */
 export const TIME_ZONES = ["UTC", "Africa/Lagos", "Africa/Accra", "Africa/Nairobi", "Africa/Johannesburg", "Africa/Cairo", "Europe/London"] as const;
@@ -16,6 +17,8 @@ export const settingsSchema = z.object({
   edgingMetresPerMin: num("Edgebander speed", 0.5, 60),
   secondsPerBandedEdge: num("Seconds per banded edge", 0, 600),
   timeZone: z.enum(TIME_ZONES),
+  /** For recorded payments; "" until a Super Admin chooses (amounts then show without a symbol). */
+  currency: z.enum([...CURRENCIES, ""]),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -26,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   edgeBandThickness: DEFAULT_OPTIONS.edgeBandThickness,
   ...ESTIMATE_ASSUMPTIONS,
   timeZone: "UTC",
+  currency: "",
 };
 
 export function estimateAssumptions(s: Settings) {

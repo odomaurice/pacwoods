@@ -11,6 +11,7 @@ import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { User } from "@/server/db/models/User";
 import { audit } from "@/server/services/audit";
+import { addClientPayment } from "@/server/services/payments";
 import { leaveCuttingQueue, queueForCutting, recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 import { PAGE_SIZE, ServiceError, type Actor } from "@/server/services/users";
 
@@ -65,6 +66,9 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
     );
     if (data.materialsAvailable) {
       await recordJobEvent(created._id, { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" }, session);
+    }
+    if (data.payment && data.payment.status !== "UNPAID") {
+      await addClientPayment(actor, created, { ...data.payment, coverage: data.payment.status }, session);
     }
     return created;
   });

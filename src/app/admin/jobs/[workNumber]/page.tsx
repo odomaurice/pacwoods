@@ -8,6 +8,7 @@ import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/compone
 import PageHeader from "@/components/PageHeader";
 import IssueList from "@/components/issues/IssueList";
 import JobPhotos from "@/components/photos/JobPhotos";
+import JobPayments from "@/components/payments/JobPayments";
 import JobProduction from "@/components/production/JobProduction";
 import { JobStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -133,6 +134,8 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
       )}
 
       <JobProduction jobId={job._id} />
+
+      <JobPayments jobId={job._id} workNumber={job.workNumber} />
 
       <div className="mb-8">
         <JobPhotos jobId={job._id} viewer={viewer} />

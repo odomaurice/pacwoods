@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadPhoto } from "@/lib/image-resize";
 import UploadPreviews, { type UploadState } from "@/components/photos/UploadPreviews";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createJobAction, updateJobAction } from "@/actions/jobs";
 import FormField from "@/components/FormField";
@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/lib/payments";
 import { jobSchema, type JobInput } from "@/lib/schemas";
 
 type ClientOption = { id: string; label: string };
@@ -42,13 +43,16 @@ export default function JobForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<JobInput>({
     resolver: zodResolver(jobSchema),
     defaultValues: existing
       ? existing.values
-      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "" },
+      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "", payment: { status: "UNPAID", amount: "", method: "", paidOn: new Date().toISOString().slice(0, 10), note: "" } },
   });
+  const paymentStatus = useWatch({ control, name: "payment.status" });
+  const payErrors = errors.payment;
 
   const onSubmit = handleSubmit((values) => {
     setServerError(undefined);
@@ -150,6 +154,56 @@ export default function JobForm({
             </>
           )}
         </div>
+      )}
+
+      {!editing && (
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium">Has the client paid for this job?</legend>
+          <div role="radiogroup" className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                ["UNPAID", "Not yet"],
+                ["PART", "Part payment"],
+                ["FULL", "Paid in full"],
+              ] as const
+            ).map(([value, label]) => (
+              <label key={value} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-muted px-3 text-sm has-checked:bg-accent has-checked:font-medium">
+                <input type="radio" value={value} className="size-4 accent-brand-charcoal" {...register("payment.status")} />
+                {label}
+              </label>
+            ))}
+          </div>
+          {paymentStatus && paymentStatus !== "UNPAID" && (
+            <div className="grid gap-3 rounded-lg bg-muted/60 p-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="pay-amount">Amount (optional)</Label>
+                <input id="pay-amount" inputMode="decimal" placeholder="e.g. 150000" className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register("payment.amount")} />
+                {payErrors?.amount && <p className="text-sm text-destructive">{payErrors.amount.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="pay-method">How it was paid</Label>
+                <select id="pay-method" className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register("payment.method")}>
+                  <option value="">Not recorded</option>
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m} value={m}>
+                      {PAYMENT_METHOD_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="pay-date">Date paid</Label>
+                <input id="pay-date" type="date" max={new Date().toISOString().slice(0, 10)} className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register("payment.paidOn")} />
+                {payErrors?.paidOn && <p className="text-sm text-destructive">{payErrors.paidOn.message}</p>}
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="pay-note">Note (optional)</Label>
+                <input id="pay-note" placeholder="e.g. receipt number" className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register("payment.note")} />
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">More payments can be recorded later on the job page, for example when a part payment is completed.</p>
+            </div>
+          )}
+        </fieldset>
       )}
 
       {!editing && (

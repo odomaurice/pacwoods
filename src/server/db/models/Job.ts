@@ -1,6 +1,7 @@
 import { Schema, type InferSchemaType, type Model } from "mongoose";
 import { defineModel } from "@/server/db/model";
 import { JOB_STATUSES } from "@/lib/jobs";
+import { CLIENT_PAYMENT_STATUS } from "@/lib/payments";
 
 /**
  * One client order. Parts, cutlists and production tasks hang off it in later
@@ -31,6 +32,8 @@ const jobSchema = new Schema(
      * assigned the first time the job enters the queue, and kept afterwards.
      */
     cuttingQueueSeq: { type: Number },
+    /** Summary of the client's recorded payments (see Payment); missing on older jobs means UNPAID. */
+    clientPayment: { type: String, enum: CLIENT_PAYMENT_STATUS, default: "UNPAID" },
   },
   { timestamps: true },
 );

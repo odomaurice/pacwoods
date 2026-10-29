@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { JOB_STATUS_LABELS, type JobStatus } from "@/lib/jobs";
+import { CLIENT_PAYMENT_LABELS, type ClientPaymentStatus } from "@/lib/payments";
 import { TASK_STATUS_LABELS, type TaskStatus } from "@/lib/production";
 import type { UserStatus } from "@/lib/schemas";
 
@@ -22,4 +23,13 @@ export function JobStatusBadge({ status }: { status: JobStatus }) {
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   const variant = status === "IN_PROGRESS" ? "default" : status === "PAUSED" || status === "CANCELLED" ? "destructive" : status === "COMPLETED" ? "outline" : "secondary";
   return <Badge variant={variant}>{TASK_STATUS_LABELS[status]}</Badge>;
+}
+
+export function ClientPaymentBadge({ status }: { status: ClientPaymentStatus }) {
+  const variant = status === "FULL" ? "default" : status === "PART" ? "secondary" : "outline";
+  return <Badge variant={variant}>{CLIENT_PAYMENT_LABELS[status]}</Badge>;
+}
+
+export function OperatorPayBadge({ paid }: { paid: boolean }) {
+  return <Badge variant={paid ? "default" : "outline"}>{paid ? "Paid" : "Not paid"}</Badge>;
 }
