@@ -56,4 +56,3 @@ export default async function JobsPage({ searchParams }: PageProps<"/admin/jobs"
     </>
   );
 }
-
