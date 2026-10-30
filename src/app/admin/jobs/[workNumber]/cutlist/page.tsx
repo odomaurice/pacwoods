@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CutlistEditor, { type MaterialOption } from "@/components/cutlist/CutlistEditor";
+import JobSteps from "@/components/jobs/JobSteps";
 import PageHeader from "@/components/PageHeader";
 import { pickPart, pickStock, type CutlistInput } from "@/lib/cutlist";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
@@ -61,7 +62,8 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
           current ? `Version ${current.version}${current.state === "APPROVED" ? " · approved" : " · draft"}` : "Enter panels and stock sheets, then press ▶ to generate the cutting plan."
         }
       />
-      <CutlistEditor workNumber={workNumber} initial={initial} materials={materials} readOnly={job.status !== "DRAFT"} preview={preview} />
+      {job.status === "DRAFT" && <JobSteps current={4} workNumber={workNumber} />}
+      <CutlistEditor workNumber={workNumber} initial={initial} materials={materials} readOnly={job.status !== "DRAFT"} preview={preview} cnc={Boolean(job.operations?.cnc)} />
     </>
   );
 }

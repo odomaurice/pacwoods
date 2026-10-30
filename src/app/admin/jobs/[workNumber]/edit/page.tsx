@@ -28,6 +28,7 @@ export default async function EditJobPage({ params }: PageProps<"/admin/jobs/[wo
             title: job.title ?? "",
             cutting: job.operations?.cutting ?? true,
             edging: job.operations?.edging ?? false,
+            cnc: job.operations?.cnc ?? false,
             clientNotes: job.clientNotes ?? "",
             internalNotes: job.internalNotes ?? "",
           },

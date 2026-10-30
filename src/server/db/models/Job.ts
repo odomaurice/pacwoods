@@ -13,6 +13,7 @@ const jobSchema = new Schema(
     workNumber: { type: String, required: true, immutable: true },
     clientId: { type: Schema.Types.ObjectId, ref: "ClientProfile", required: true },
     operations: {
+      cnc: { type: Boolean, default: false },
       cutting: { type: Boolean, required: true },
       edging: { type: Boolean, required: true },
     },

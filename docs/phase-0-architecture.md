@@ -515,3 +515,14 @@ method, date and note; mistakes are voided with a reason, never edited.
 by client or operator. Job prices and operator pay rates are not stored: there
 is nothing to compare payments against, so "part" or "full" is the admin's
 statement, not a calculation.
+
+**CNC machining (2026-10-30):** an optional stage between cutting and edging
+(cutting → CNC → edging), ticked per job like edging, worked by operators
+with the CNC skill through its own first-in-first-out queue. Each panel can
+carry machining notes in the cutlist; the CNC operator sees only the panels
+with notes. No time estimate for CNC yet: there are no machine figures to
+base one on.
+
+**New jobs (2026-10-30)** are created step by step: client (pick or
+register), job details, materials, cutlist. Operators see only their own
+stage's information.

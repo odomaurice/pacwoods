@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import ViewButton from "@/components/ViewButton";
-import { STAGES, STAGE_LABELS } from "@/lib/production";
+import { STAGES, STAGE_LABELS, stageNoun } from "@/lib/production";
 import { requireRole } from "@/server/auth/guards";
 import { listStageQueue } from "@/server/services/production";
 
@@ -26,7 +26,7 @@ export default async function QueuesPage() {
               {STAGE_LABELS[stage]} queue <span className="font-normal text-muted-foreground">· {waiting.length}</span>
             </h2>
             {waiting.length === 0 ? (
-              <EmptyState title={`Nothing in the ${STAGE_LABELS[stage].toLowerCase()} queue.`} />
+              <EmptyState title={`Nothing in the ${stageNoun(stage)} queue.`} />
             ) : (
               <div className="rounded-lg bg-card">
                 <Table>
@@ -51,7 +51,7 @@ export default async function QueuesPage() {
                           <TaskStatusBadge status={task.status} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <ViewButton href={`/admin/tasks/${task._id}`} label={`View ${task.workNumber} ${STAGE_LABELS[stage].toLowerCase()}`} />
+                          <ViewButton href={`/admin/tasks/${task._id}`} label={`View ${task.workNumber} ${stageNoun(stage)}`} />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -61,7 +61,7 @@ export default async function QueuesPage() {
             )}
             {upcoming.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                {stage === "EDGING" ? "Waiting for cutting to finish" : "Not in the queue yet (cutlist or materials pending)"}:{" "}
+                {stage === "CUTTING" ? "Not in the queue yet (cutlist or materials pending)" : "Waiting for the stage before it to finish"}:{" "}
                 {upcoming.map((r) => r.task.workNumber).join(", ")}
               </p>
             )}

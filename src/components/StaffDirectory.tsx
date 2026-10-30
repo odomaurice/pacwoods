@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Role } from "@/lib/roles";
 import { listUsers } from "@/server/services/users";
 
-const CAPABILITY_LABELS: Record<string, string> = { CUTTING: "Cutting", EDGING: "Edging" };
+const CAPABILITY_LABELS: Record<string, string> = { CUTTING: "Cutting", CNC: "CNC", EDGING: "Edging" };
 
 /** Searchable, paginated list of Admin or Operator accounts. */
 export default async function StaffDirectory({

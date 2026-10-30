@@ -36,7 +36,8 @@ describe("queue rule", () => {
     expect(rules.get("2")?.canStart).toBe(true);
   });
 
-  it("explains edging that waits for cutting", () => {
-    expect(eligibility([t("1", "BLOCKED", null, "EDGING")]).get("1")).toEqual({ canStart: false, reason: "Waiting for cutting to finish." });
+  it("explains later stages that wait for the one before", () => {
+    expect(eligibility([t("1", "BLOCKED", null, "EDGING")]).get("1")).toEqual({ canStart: false, reason: "Waiting for the stage before it to finish." });
+    expect(eligibility([t("2", "BLOCKED", null, "CNC")]).get("2")?.canStart).toBe(false);
   });
 });

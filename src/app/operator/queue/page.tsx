@@ -7,7 +7,7 @@ import TaskActions from "@/components/production/TaskActions";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import ViewButton from "@/components/ViewButton";
-import { STAGES, STAGE_LABELS } from "@/lib/production";
+import { STAGES, STAGE_LABELS, stageNoun } from "@/lib/production";
 import { requireRole } from "@/server/auth/guards";
 import { getJobCardData, scanUrl } from "@/server/services/jobCards";
 import { operatorQueue } from "@/server/services/production";
@@ -39,7 +39,7 @@ export default async function OperatorQueue() {
                 {STAGE_LABELS[stage]} queue <span className="font-normal text-muted-foreground">· {list.length}</span>
               </h2>
               {list.length === 0 ? (
-                <EmptyState title={`No ${STAGE_LABELS[stage].toLowerCase()} waiting.`} />
+                <EmptyState title={`No ${stageNoun(stage)} waiting.`} />
               ) : (
                 <ol className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                   {list.map(({ task, rule, card }, i) => {
@@ -70,7 +70,7 @@ export default async function OperatorQueue() {
                     return (
                       <li key={id}>
                         {card ? (
-                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header} compact>
+                          <JobSummaryCard data={card.data} scanUrl={card.url} header={header} compact stage={task.stage}>
                             {actions}
                           </JobSummaryCard>
                         ) : (

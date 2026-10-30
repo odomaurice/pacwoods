@@ -26,10 +26,13 @@ type ClientOption = { id: string; label: string };
 export default function JobForm({
   clients,
   defaultClientId,
+  chosenClient,
   existing,
 }: {
   clients?: ClientOption[];
   defaultClientId?: string;
+  /** Picked in the client step: shown, with a link back to change it. */
+  chosenClient?: string;
   /** Editing a draft: the client cannot change, so it rides along unseen. */
   existing?: { workNumber: string; values: JobInput };
 }) {
@@ -49,7 +52,7 @@ export default function JobForm({
     resolver: zodResolver(jobSchema),
     defaultValues: existing
       ? existing.values
-      : { clientId: defaultClientId ?? "", cutting: true, edging: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "", payment: { status: "UNPAID", amount: "", method: "", paidOn: new Date().toISOString().slice(0, 10), note: "" } },
+      : { clientId: defaultClientId ?? "", cutting: true, edging: false, cnc: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "", payment: { status: "UNPAID", amount: "", method: "", paidOn: new Date().toISOString().slice(0, 10), note: "" } },
   });
   const paymentStatus = useWatch({ control, name: "payment.status" });
   const payErrors = errors.payment;
@@ -79,7 +82,7 @@ export default function JobForm({
         mark(i, error ? { error: true } : { done: true });
       }
       setProgress(undefined);
-      router.push(`/admin/jobs/${result.workNumber}`);
+      router.push(`/admin/jobs/${result.workNumber}/materials`);
     });
   });
 
@@ -91,7 +94,18 @@ export default function JobForm({
         </Alert>
       )}
 
-      {clients && (
+      {chosenClient && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent p-3 text-sm">
+          <span>
+            <span className="block text-muted-foreground">Client</span>
+            <span className="font-medium">{chosenClient}</span>
+          </span>
+          <Link href="/admin/jobs/new" className="ml-auto text-sm font-medium underline-offset-4 hover:underline">
+            Change
+          </Link>
+        </div>
+      )}
+      {clients && !chosenClient && (
         <div className="space-y-2">
           <Label htmlFor="clientId">Client</Label>
           <select
@@ -121,7 +135,14 @@ export default function JobForm({
         </label>
         <label className="flex min-h-11 items-center gap-3 text-sm">
           <input type="checkbox" className="size-5 accent-brand-charcoal" {...register("edging")} />
-          Edging (after cutting)
+          Edging
+        </label>
+        <label className="flex min-h-11 items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("cnc")} />
+          <span>
+            CNC machining
+            <span className="block text-muted-foreground">Drilling, routing or grooves on the CNC, after cutting and before edging. Add the details per panel in the cutlist.</span>
+          </span>
         </label>
         {errors.cutting && <p className="text-sm text-destructive">{errors.cutting.message}</p>}
       </fieldset>

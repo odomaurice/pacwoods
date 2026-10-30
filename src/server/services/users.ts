@@ -309,15 +309,16 @@ export async function getClient(clientId: string) {
 /** Active clients for pickers, labelled "Business — Name (PCL-000001)". */
 export async function listActiveClientOptions() {
   await connectDb();
-  const rows = await ClientProfile.aggregate<{ _id: Types.ObjectId; clientNumber: string; businessName?: string; name: string }>([
+  const rows = await ClientProfile.aggregate<{ _id: Types.ObjectId; clientNumber: string; businessName?: string; name: string; phone?: string }>([
     { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
     { $unwind: "$user" },
     { $match: { "user.status": "ACTIVE" } },
-    { $project: { clientNumber: 1, businessName: 1, name: "$user.name" } },
+    { $project: { clientNumber: 1, businessName: 1, name: "$user.name", phone: "$user.phone" } },
     { $sort: { businessName: 1, name: 1 } },
   ]);
   return rows.map((r) => ({
     id: r._id.toString(),
     label: `${r.businessName ? `${r.businessName} — ` : ""}${r.name} (${r.clientNumber})`,
+    phone: r.phone,
   }));
 }

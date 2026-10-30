@@ -18,7 +18,7 @@ const GRID = "#e5e7e9";
 
 const PHASES: Array<{ name: string; color: string; statuses: JobStatus[] }> = [
   { name: "Preparation", color: SERIES[1], statuses: ["DRAFT", "AWAITING_APPROVAL", "AWAITING_MATERIAL"] },
-  { name: "Cutting", color: SERIES[0], statuses: ["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS"] },
+  { name: "Cutting and CNC", color: SERIES[0], statuses: ["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS", "QUEUED_FOR_CNC", "CNC_IN_PROGRESS"] },
   { name: "Edging", color: SERIES[2], statuses: ["AWAITING_EDGING", "QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS", "AWAITING_QUALITY_CHECK"] },
   { name: "Finished", color: SERIES[4], statuses: ["COMPLETED"] },
   { name: "Stopped", color: SERIES[3], statuses: ["ON_HOLD", "CANCELLED"] },
@@ -158,14 +158,14 @@ export function DailyBarChart({ data, title, unit }: { data: Daily; title: strin
 }
 
 /** Open work per operator, split by stage. Click a bar to open the operator. */
-export function WorkloadChart({ data }: { data: Array<{ id: string; name: string; cutting: number; edging: number }> }) {
+export function WorkloadChart({ data }: { data: Array<{ id: string; name: string; cutting: number; cnc: number; edging: number }> }) {
   const router = useRouter();
   const height = useMemo(() => Math.max(120, data.length * 44 + 60), [data.length]);
   return (
     <ChartFrame
       title="Operator workload"
       description="Assigned work not yet completed. Click a bar to open the operator."
-      table={<SimpleTable head={["Operator", "Cutting", "Edging"]} rows={data.map((d) => [d.name, d.cutting, d.edging])} />}
+      table={<SimpleTable head={["Operator", "Cutting", "CNC", "Edging"]} rows={data.map((d) => [d.name, d.cutting, d.cnc, d.edging])} />}
     >
       {data.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">No operator has taken any work yet.</p>
@@ -179,6 +179,7 @@ export function WorkloadChart({ data }: { data: Array<{ id: string; name: string
               <Tooltip cursor={{ fill: "#f1f2f3" }} contentStyle={tooltipStyle} />
               <Legend verticalAlign="top" align="left" iconType="square" wrapperStyle={{ fontSize: 13, color: INK, paddingBottom: 8 }} />
               <Bar dataKey="cutting" name="Cutting" stackId="w" fill={SERIES[0]} stroke="#ffffff" strokeWidth={2} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
+              <Bar dataKey="cnc" name="CNC" stackId="w" fill={SERIES[1]} stroke="#ffffff" strokeWidth={2} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
               <Bar dataKey="edging" name="Edging" stackId="w" fill={SERIES[2]} stroke="#ffffff" strokeWidth={2} radius={[0, 4, 4, 0]} onClick={(d) => router.push(`/admin/accounts/${(d as { id?: string }).id}`)} style={{ cursor: "pointer" }} />
             </BarChart>
           </ResponsiveContainer>

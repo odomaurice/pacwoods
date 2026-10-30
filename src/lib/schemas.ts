@@ -74,6 +74,8 @@ export const jobDetailsSchema = z
     title: optionalText(160),
     cutting: z.boolean(),
     edging: z.boolean(),
+    /** CNC machining between cutting and edging (drilling, routing, grooves). */
+    cnc: z.boolean().optional(),
     clientNotes: optionalText(2000),
     internalNotes: optionalText(2000),
   })

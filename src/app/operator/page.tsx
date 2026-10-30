@@ -54,6 +54,7 @@ export default async function OperatorOverview() {
         </h2>
         {focus && card ? (
           <JobSummaryCard
+            stage={focus.task.stage}
             data={card.data}
             scanUrl={await scanUrl(card.qrToken)}
             header={<p className="text-xs font-semibold tracking-[0.2em] text-brand-gold uppercase">{STAGE_LABELS[focus.task.stage]}</p>}

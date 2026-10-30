@@ -4,7 +4,7 @@ import Detail from "@/components/Detail";
 import ReleaseTask from "@/components/production/ReleaseTask";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import ViewButton from "@/components/ViewButton";
-import { STAGE_LABELS, formatDuration } from "@/lib/production";
+import { STAGE_LABELS, formatDuration, stageNoun } from "@/lib/production";
 import { connectDb } from "@/server/db/connect";
 import { User } from "@/server/db/models/User";
 import { activeMs, tasksForJob } from "@/server/services/production";
@@ -43,7 +43,7 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
               <TaskStatusBadge status={task.status} />
               {task.queueSeq != null && <span className="text-sm text-muted-foreground">Ticket #{task.queueSeq}</span>}
               <span className="ml-auto">
-                <ViewButton href={`/admin/tasks/${task._id}`} label={`View ${STAGE_LABELS[task.stage].toLowerCase()}`} />
+                <ViewButton href={`/admin/tasks/${task._id}`} label={`View ${stageNoun(task.stage)}`} />
               </span>
             </div>
 

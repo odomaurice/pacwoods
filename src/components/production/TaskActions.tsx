@@ -9,7 +9,7 @@ import { ReportIssueButton } from "@/components/issues/IssueButtons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { STAGE_LABELS, completionSchema, type Stage, type TaskStatus } from "@/lib/production";
+import { completionSchema, stageNoun, type Stage, type TaskStatus } from "@/lib/production";
 
 type Props = {
   taskId: string;
@@ -31,7 +31,7 @@ type Props = {
  */
 export default function TaskActions({ taskId, workNumber, stage, status, canStart, reason, totalPanels, startOnly = false, finishedPhotos = 0 }: Props) {
   const router = useRouter();
-  const word = STAGE_LABELS[stage].toLowerCase();
+  const word = stageNoun(stage);
 
   async function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>, success: string) {
     const result = await action();
@@ -68,7 +68,7 @@ export default function TaskActions({ taskId, workNumber, stage, status, canStar
       </div>
       {!canStart && reason && status !== "IN_PROGRESS" && <p className={startOnly ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{reason}</p>}
       {status === "IN_PROGRESS" && finishedPhotos === 0 && (
-        <p className="text-sm font-medium text-brand-gold-deep">Add at least one photo of the finished work (below) before completing.</p>
+        <p className="text-sm font-medium text-brand-gold-deep">Add at least one photo of the finished work (Photos, at the bottom of the page) before completing.</p>
       )}
     </div>
   );

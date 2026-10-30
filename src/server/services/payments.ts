@@ -10,7 +10,7 @@ import {
   type ClientPaymentStatus,
   type PaymentMethod,
 } from "@/lib/payments";
-import { STAGE_LABELS, type Stage } from "@/lib/production";
+import { stageNoun, type Stage } from "@/lib/production";
 import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Job } from "@/server/db/models/Job";
@@ -111,7 +111,7 @@ export async function recordOperatorPayment(actor: Actor, taskId: string, raw: u
       );
       await recordJobEvent(
         task.jobId,
-        { type: "OPERATOR_PAID", actorId: actor.id, note: `${operator?.name ?? "Operator"} paid for ${STAGE_LABELS[task.stage as Stage].toLowerCase()}${await money(fields.amountMinor)}`, clientVisible: false },
+        { type: "OPERATOR_PAID", actorId: actor.id, note: `${operator?.name ?? "Operator"} paid for ${stageNoun(task.stage as Stage)}${await money(fields.amountMinor)}`, clientVisible: false },
         session,
       );
     });

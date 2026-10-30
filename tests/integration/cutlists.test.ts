@@ -124,7 +124,7 @@ describe.skipIf(!hasDatabase)("cutlists and job cards (MongoDB)", () => {
     const job = await newJob(true);
     await generatePlan(root, job.workNumber, input([panel("Door", 700, 400, 2, { length1: true, length2: true, width1: true, width2: false })]));
     const card = await getJobCardData(job.workNumber, { ownerUserId: clientUserId });
-    expect(card?.data.operations).toEqual({ cutting: true, edging: true });
+    expect(card?.data.operations).toEqual({ cutting: true, edging: true, cnc: false });
     expect(card?.data.cutlist?.parts[0].materialName).toBe("MDF");
     expect(card?.data.internalNotes).toBeUndefined();
     expect(await getJobCardData(job.workNumber, { ownerUserId: root.id })).toBeNull();

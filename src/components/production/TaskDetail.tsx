@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { DrawPart } from "@/components/cutlist/PlanDrawing";
 import CuttingGuide from "@/components/cutlist/CuttingGuide";
 import PlanViewer from "@/components/cutlist/PlanViewer";
@@ -5,7 +6,8 @@ import Detail from "@/components/Detail";
 import { TaskStatusBadge } from "@/components/StatusBadge";
 import { GRAIN_LABELS, describeEdges, estimateMinutes, formatMinutes } from "@/lib/cutlist";
 import { edgingLength } from "@/lib/cutting/engine";
-import { STAGE_LABELS, formatDuration, type Stage, type TaskStatus } from "@/lib/production";
+import type { Operations } from "@/lib/jobs";
+import { STAGE_LABELS, formatDuration, nextStage, type Stage, type TaskStatus } from "@/lib/production";
 import { PART_FILLS, guideParts } from "@/lib/plan-view";
 import { estimateAssumptions } from "@/lib/settings";
 import type { CutlistVersionDoc } from "@/server/db/models/CutlistVersion";
@@ -18,7 +20,7 @@ export type TaskDetailProps = {
   status: TaskStatus;
   queueSeq?: number | null;
   clientLabel: string;
-  operations: { cutting: boolean; edging: boolean };
+  operations: Operations;
   clientNotes?: string | null;
   internalNotes?: string | null;
   cutlist: Pick<CutlistVersionDoc, "version" | "parts" | "stockSheets" | "options" | "plan"> | null;
@@ -29,19 +31,27 @@ export type TaskDetailProps = {
   guide?: { taskId: string; done: string[]; canTick: boolean };
 };
 
-/** What the operator needs at the machine for one stage of one job. */
+/**
+ * What the operator needs at the machine for one stage of one job, and
+ * nothing from the other stages: the cutter gets the cutlist, the plan and
+ * the step-by-step guide; CNC gets the panels to machine; edging gets the
+ * panels to band.
+ */
 export default async function TaskDetail(p: TaskDetailProps) {
   const assumptions = estimateAssumptions(await getSettings());
   const cl = p.cutlist;
-  const totalPanels = cl?.parts.reduce((n, x) => n + x.quantity, 0) ?? 0;
-  const estimate = cl?.plan ? estimateMinutes(cl.plan.totals, cl, { cutting: p.stage === "CUTTING", edging: p.stage === "EDGING" }, assumptions) : null;
   const numbered = (cl?.parts ?? []).map((x, i) => ({ x, no: i + 1 }));
   const banded = numbered.filter(({ x }) => x.edges.length1 || x.edges.length2 || x.edges.width1 || x.edges.width2);
+  const machined = numbered.filter(({ x }) => x.machining);
+  const count = (rows: typeof numbered) => rows.reduce((n, { x }) => n + x.quantity, 0);
+  const estimate =
+    cl?.plan && p.stage !== "CNC" ? estimateMinutes(cl.plan.totals, cl, { cutting: p.stage === "CUTTING", edging: p.stage === "EDGING" }, assumptions) : null;
   const drawParts: DrawPart[] = (cl?.parts ?? []).map((x, i) => ({ ref: x.ref, label: x.label || `#${i + 1}`, fill: PART_FILLS[i % PART_FILLS.length], edges: x.edges }));
   const stockLabels = Object.fromEntries(
     (cl?.stockSheets ?? []).map((s) => [s.ref, [s.label, s.materialName && `${s.materialName} ${s.thicknessMm} mm`].filter(Boolean).join(" · ") || `${s.length}×${s.width}`]),
   );
   const materials = [...new Set((cl?.parts ?? []).map((x) => (x.materialName ? `${x.materialName} ${x.thicknessMm} mm` : "Unspecified")))];
+  const next = nextStage(p.operations, p.stage);
 
   return (
     <div className="space-y-6">
@@ -52,13 +62,19 @@ export default async function TaskDetail(p: TaskDetailProps) {
         </Detail>
         <Detail label="Queue ticket">{p.queueSeq != null ? `#${p.queueSeq}` : "—"}</Detail>
         <Detail label="Client">{p.clientLabel}</Detail>
-        <Detail label="Material">{materials.join(", ") || "—"}</Detail>
-        <Detail label="Panels">{totalPanels}</Detail>
-        <Detail label="Estimated time (estimate)">
-          {estimate ? formatMinutes(p.stage === "CUTTING" ? estimate.cuttingMin : estimate.edgingMin) : "—"}
-        </Detail>
+        {p.stage !== "EDGING" && <Detail label="Material">{materials.join(", ") || "—"}</Detail>}
+        {p.stage === "CUTTING" && <Detail label="Panels to cut">{count(numbered)}</Detail>}
+        {p.stage === "CNC" && <Detail label="Panels to machine">{count(machined)}</Detail>}
+        {p.stage === "EDGING" && (
+          <Detail label="Panels to band">
+            {count(banded)} · {(edgingLength(cl?.parts ?? []) / 1000).toFixed(2)} m of banding
+          </Detail>
+        )}
+        {estimate && (
+          <Detail label="Estimated time (estimate)">{formatMinutes(p.stage === "CUTTING" ? estimate.cuttingMin : estimate.edgingMin)}</Detail>
+        )}
         <Detail label="Time worked">{formatDuration(p.activeMs)}</Detail>
-        {p.stage === "CUTTING" && p.operations.edging && <Detail label="Next">Edging, after you complete cutting</Detail>}
+        {next && <Detail label="Next">{STAGE_LABELS[next]}, after you complete this stage</Detail>}
       </dl>
 
       {(p.clientNotes || p.internalNotes) && (
@@ -93,65 +109,62 @@ export default async function TaskDetail(p: TaskDetailProps) {
 
       {!cl ? (
         <p className="rounded-lg bg-muted p-4 text-sm">No approved cutlist for this job.</p>
-      ) : (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">{p.stage === "EDGING" ? "Edge banding" : "Panels"}</h2>
-          <div className="overflow-x-auto rounded-lg bg-card">
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
-                  <th>#</th>
-                  <th>Label</th>
-                  <th className="text-right">L × W (mm)</th>
-                  <th className="text-right">Qty</th>
-                  <th>Grain</th>
-                  <th>Edges</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(p.stage === "EDGING" ? banded : numbered).map(({ x, no }) => (
-                  <tr key={x.ref} className="odd:bg-muted/60 [&>td]:px-3 [&>td]:py-2">
-                    <td className="tabular-nums">{no}</td>
-                    <td>{x.label || "—"}</td>
-                    <td className="text-right tabular-nums">
-                      {x.length} × {x.width}
-                    </td>
-                    <td className="text-right tabular-nums">{x.quantity}</td>
-                    <td>{GRAIN_LABELS[x.grain]}</td>
-                    <td>{describeEdges(x.edges)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {p.stage === "EDGING" && (
-            <p className="text-sm text-muted-foreground">Total edge banding: {(edgingLength(cl.parts) / 1000).toFixed(2)} m</p>
-          )}
-        </section>
-      )}
-
-      {p.stage === "CUTTING" && cl?.plan && (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold">How to cut it</h2>
-            <p className="text-sm text-muted-foreground">One saw cut at a time, in order: strips off the board first, then each strip into panels.</p>
-          </div>
-          <CuttingGuide
-            sheets={cl.plan.sheets}
-            parts={guideParts(cl.parts)}
-            stockLabels={stockLabels}
-            kerf={cl.options.kerf}
-            edgeTrim={cl.options.edgeTrim}
-            progress={p.guide}
+      ) : p.stage === "CUTTING" ? (
+        <>
+          <PartsTable
+            title="Cutlist"
+            note="Panel numbers (3 = row 3) match the plan and the step-by-step guide; each copy is marked 3.1, 3.2 and so on."
+            rows={numbered}
+            columns={["Grain"]}
+            cell={({ x }) => [GRAIN_LABELS[x.grain]]}
           />
-        </section>
-      )}
-
-      {p.stage === "CUTTING" && cl?.plan && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Whole plan</h2>
-          <PlanViewer sheets={cl.plan.sheets} parts={drawParts} stockLabels={stockLabels} showLabels={cl.options.labelsOnPanels} />
-        </section>
+          {cl.plan && (
+            <section className="space-y-3">
+              <h2 className="text-lg font-semibold">Cutting plan</h2>
+              <PlanViewer sheets={cl.plan.sheets} parts={drawParts} stockLabels={stockLabels} showLabels={cl.options.labelsOnPanels} compact />
+            </section>
+          )}
+          {cl.plan && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold">How to cut it</h2>
+                <p className="text-sm text-muted-foreground">One saw cut at a time, in order: strips off the board first, then each strip into panels.</p>
+              </div>
+              <div className="max-w-5xl">
+                <CuttingGuide
+                  sheets={cl.plan.sheets}
+                  parts={guideParts(cl.parts)}
+                  stockLabels={stockLabels}
+                  kerf={cl.options.kerf}
+                  edgeTrim={cl.options.edgeTrim}
+                  progress={p.guide}
+                />
+              </div>
+            </section>
+          )}
+        </>
+      ) : p.stage === "CNC" ? (
+        machined.length === 0 ? (
+          <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">No panel on this cutlist has CNC notes. Ask the office what needs machining before you start.</p>
+        ) : (
+          <PartsTable
+            title="Panels to machine"
+            note={`${count(numbered) - count(machined)} other panel(s) on this job need no machining.`}
+            rows={machined}
+            columns={["What to machine"]}
+            cell={({ x }) => [<span key="m" className="font-medium whitespace-pre-line">{x.machining}</span>]}
+          />
+        )
+      ) : banded.length === 0 ? (
+        <p className="rounded-lg bg-muted p-4 text-sm">No panel on this cutlist has edge banding.</p>
+      ) : (
+        <PartsTable
+          title="Panels to band"
+          note={`Total edge banding: ${(edgingLength(cl.parts) / 1000).toFixed(2)} m. Panels are marked with their number at the saw.`}
+          rows={banded}
+          columns={["Edges"]}
+          cell={({ x }) => [describeEdges(x.edges)]}
+        />
       )}
 
       {p.sessions.length > 0 && (
@@ -173,5 +186,47 @@ export default async function TaskDetail(p: TaskDetailProps) {
         </section>
       )}
     </div>
+  );
+}
+
+type Row = { x: NonNullable<TaskDetailProps["cutlist"]>["parts"][number]; no: number };
+
+/** The stage's panels: number, label, size and quantity, plus what this stage needs to know. */
+function PartsTable({ title, note, rows, columns, cell }: { title: string; note?: string; rows: Row[]; columns: string[]; cell: (r: Row) => ReactNode[] }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="overflow-x-auto rounded-lg bg-card">
+        <table className="w-full text-sm">
+          <thead className="text-left text-muted-foreground">
+            <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:font-medium">
+              <th>#</th>
+              <th>Label</th>
+              <th className="text-right">L × W (mm)</th>
+              <th className="text-right">Qty</th>
+              {columns.map((c) => (
+                <th key={c}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.x.ref} className="align-top odd:bg-muted/60 [&>td]:px-3 [&>td]:py-2">
+                <td className="font-semibold tabular-nums">{r.no}</td>
+                <td>{r.x.label || "—"}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">
+                  {r.x.length} × {r.x.width}
+                </td>
+                <td className="text-right tabular-nums">{r.x.quantity}</td>
+                {cell(r).map((c, i) => (
+                  <td key={i}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {note && <p className="text-sm text-muted-foreground">{note}</p>}
+    </section>
   );
 }

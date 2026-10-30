@@ -135,7 +135,7 @@ export function NeedsAttention({ data, counts }: { data: Attention; counts: { un
 type Snapshot = Array<{ id: string; workNumber: string; queueSeq?: number | null; status: TaskStatus; operator?: string }>;
 
 /** The head of each production queue, as the floor sees it. */
-export function QueueSnapshots({ cutting, edging }: { cutting: Snapshot; edging: Snapshot }) {
+export function QueueSnapshots({ cutting, cnc, edging }: { cutting: Snapshot; cnc: Snapshot; edging: Snapshot }) {
   const list = (title: string, rows: Snapshot) => (
     <div>
       <h3 className="mb-1 text-sm font-medium text-muted-foreground">{title}</h3>
@@ -168,6 +168,7 @@ export function QueueSnapshots({ cutting, edging }: { cutting: Snapshot; edging:
         </Link>
       </div>
       {list("Cutting", cutting)}
+      {cnc.length > 0 && list("CNC machining", cnc)}
       {list("Edging", edging)}
     </section>
   );

@@ -17,12 +17,12 @@ export async function notify(userIds: Array<string | Types.ObjectId>, note: Note
 }
 
 /** Tells every operator who can do a stage that a job is ready for it to be taken. */
-export async function notifyStageOperators(stage: "CUTTING" | "EDGING", workNumber: string, session?: ClientSession, except?: Types.ObjectId) {
+export async function notifyStageOperators(stage: "CUTTING" | "CNC" | "EDGING", workNumber: string, session?: ClientSession, except?: Types.ObjectId) {
   const ops = await User.find({ role: "OPERATOR", status: "ACTIVE", capabilities: stage, ...(except ? { _id: { $ne: except } } : {}) })
     .select("_id")
     .session(session ?? null)
     .lean();
-  await notify(ops.map((o) => o._id), { title: `${workNumber} is ready for ${stage === "CUTTING" ? "cutting" : "edging"}`, href: "/operator/queue" }, session);
+  await notify(ops.map((o) => o._id), { title: `${workNumber} is ready for ${stage === "CUTTING" ? "cutting" : stage === "CNC" ? "CNC machining" : "edging"}`, href: "/operator/queue" }, session);
 }
 
 /** What a client is told for each job event they care about. */
@@ -31,6 +31,8 @@ const CLIENT_MESSAGES: Record<string, (wn: string) => string> = {
   MATERIAL_CONFIRMED: (wn) => `The wood for ${wn} is in the workshop.`,
   CUTTING_STARTED: (wn) => `Cutting has started on ${wn}.`,
   CUTTING_COMPLETED: (wn) => `Cutting is finished on ${wn}.`,
+  CNC_STARTED: (wn) => `CNC machining has started on ${wn}.`,
+  CNC_COMPLETED: (wn) => `CNC machining is finished on ${wn}.`,
   EDGING_STARTED: (wn) => `Edging has started on ${wn}.`,
   EDGING_COMPLETED: (wn) => `Edging is finished on ${wn}.`,
   JOB_COMPLETED: (wn) => `${wn} is complete and ready for collection.`,

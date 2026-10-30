@@ -43,7 +43,7 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
         {
           workNumber: formatWorkNumber(year, seq),
           clientId: client._id,
-          operations: { cutting: data.cutting, edging: data.edging },
+          operations: { cutting: data.cutting, edging: data.edging, cnc: Boolean(data.cnc) },
           title: data.title || undefined,
           clientNotes: data.clientNotes || undefined,
           internalNotes: data.internalNotes || undefined,
@@ -61,6 +61,7 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
     await ProductionTask.create(
       [
         { jobId: created._id, workNumber: created.workNumber, stage: "CUTTING" as const, status: "BLOCKED" as const },
+        ...(data.cnc ? [{ jobId: created._id, workNumber: created.workNumber, stage: "CNC" as const, status: "BLOCKED" as const }] : []),
         ...(data.edging ? [{ jobId: created._id, workNumber: created.workNumber, stage: "EDGING" as const, status: "BLOCKED" as const }] : []),
       ],
       { session, ordered: true },
@@ -93,7 +94,7 @@ export async function updateDraftJob(actor: Actor, workNumber: string, input: Jo
     { workNumber, status: "DRAFT" },
     {
       $set: {
-        operations: { cutting: data.cutting, edging: data.edging },
+        operations: { cutting: data.cutting, edging: data.edging, cnc: Boolean(data.cnc) },
         title: data.title || undefined,
         clientNotes: data.clientNotes || undefined,
         internalNotes: data.internalNotes || undefined,
@@ -102,15 +103,13 @@ export async function updateDraftJob(actor: Actor, workNumber: string, input: Jo
     { returnDocument: "after" },
   );
   if (!job) throw new ServiceError("CONFLICT", "Only draft jobs can be edited.");
-  // Keep the edging stage in step with the job (a draft has not started).
-  if (data.edging) {
-    await ProductionTask.updateOne(
-      { jobId: job._id, stage: "EDGING" },
-      { $setOnInsert: { workNumber: job.workNumber, status: "BLOCKED" } },
-      { upsert: true },
-    );
-  } else {
-    await ProductionTask.deleteOne({ jobId: job._id, stage: "EDGING", status: "BLOCKED" });
+  // Keep the later stages in step with the job (a draft has not started).
+  for (const [stage, wanted] of [["CNC", Boolean(data.cnc)], ["EDGING", data.edging]] as const) {
+    if (wanted) {
+      await ProductionTask.updateOne({ jobId: job._id, stage }, { $setOnInsert: { workNumber: job.workNumber, status: "BLOCKED" } }, { upsert: true });
+    } else {
+      await ProductionTask.deleteOne({ jobId: job._id, stage, status: "BLOCKED" });
+    }
   }
   await audit({ actorId: actor.id, action: "job.updated", targetType: "Job", targetId: job._id });
   return job;
@@ -121,7 +120,7 @@ export type JobRow = {
   workNumber: string;
   title?: string;
   status: JobStatus;
-  operations: { cutting: boolean; edging: boolean };
+  operations: { cutting: boolean; edging: boolean; cnc?: boolean | null };
   createdAt: Date;
   client: { _id: Types.ObjectId; clientNumber: string; businessName?: string; name: string };
 };

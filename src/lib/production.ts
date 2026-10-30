@@ -1,10 +1,36 @@
 /** Production stages and the queue rule, shared by server and UI. */
 import { z } from "zod";
+import type { JobStatus, Operations } from "@/lib/jobs";
 
-export const STAGES = ["CUTTING", "EDGING"] as const;
+/** Production stages, in the order work goes through them. */
+export const STAGES = ["CUTTING", "CNC", "EDGING"] as const;
 export type Stage = (typeof STAGES)[number];
 
-export const STAGE_LABELS: Record<Stage, string> = { CUTTING: "Cutting", EDGING: "Edging" };
+export const STAGE_LABELS: Record<Stage, string> = { CUTTING: "Cutting", CNC: "CNC machining", EDGING: "Edging" };
+
+/** A stage's name inside a sentence: "cutting", "edging", but "CNC machining". */
+export function stageNoun(stage: Stage): string {
+  return stage === "CNC" ? STAGE_LABELS.CNC : STAGE_LABELS[stage].toLowerCase();
+}
+
+/** The job status while a stage waits in its queue, and while it is being worked. */
+export const STAGE_STATUS: Record<Stage, { queued: JobStatus; active: JobStatus }> = {
+  CUTTING: { queued: "QUEUED_FOR_CUTTING", active: "CUTTING_IN_PROGRESS" },
+  CNC: { queued: "QUEUED_FOR_CNC", active: "CNC_IN_PROGRESS" },
+  EDGING: { queued: "QUEUED_FOR_EDGING", active: "EDGING_IN_PROGRESS" },
+};
+
+/** The stages a job needs, in order. */
+export function stagesFor(ops: Operations | null | undefined): Stage[] {
+  if (!ops) return ["CUTTING"];
+  return STAGES.filter((s) => (s === "CUTTING" ? ops.cutting : s === "CNC" ? Boolean(ops.cnc) : ops.edging));
+}
+
+/** The stage after `stage` on this job, if any. */
+export function nextStage(ops: Operations | null | undefined, stage: Stage): Stage | undefined {
+  const order = stagesFor(ops);
+  return order[order.indexOf(stage) + 1];
+}
 
 export const TASK_STATUSES = ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED", "COMPLETED", "CANCELLED"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -50,7 +76,7 @@ export function eligibility(tasks: QueueItem[]): Map<string, Eligibility> {
     if (t.status === "BLOCKED") {
       result.set(t.id, {
         canStart: false,
-        reason: t.stage === "EDGING" ? "Waiting for cutting to finish." : "Not in the cutting queue yet: waiting for the cutlist to be approved and materials confirmed.",
+        reason: t.stage === "CUTTING" ? "Not in the cutting queue yet: waiting for the cutlist to be approved and materials confirmed." : "Waiting for the stage before it to finish.",
       });
     }
     if (t.status === "IN_PROGRESS") result.set(t.id, { canStart: false, reason: "In progress." });

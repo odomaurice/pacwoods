@@ -1,7 +1,7 @@
 import type { Types } from "mongoose";
 import { PhotoGrid, PhotoUploader, type GridPhoto } from "@/components/photos/PhotoControls";
 import { MAX_PHOTOS, PHOTO_KIND_LABELS } from "@/lib/photos";
-import { STAGE_LABELS, type Stage } from "@/lib/production";
+import { STAGES, STAGE_LABELS, type Stage } from "@/lib/production";
 import { connectDb } from "@/server/db/connect";
 import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
@@ -18,7 +18,7 @@ const when = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: 
  * stage. What the viewer may add or remove follows the same rules the server
  * enforces on upload and delete.
  */
-export default async function JobPhotos({ jobId, viewer, title = "Photos" }: { jobId: Types.ObjectId; viewer: Viewer; title?: string }) {
+export default async function JobPhotos({ jobId, viewer, title = "Photos", stage }: { jobId: Types.ObjectId; viewer: Viewer; title?: string; /** Show finished work for this stage only. */ stage?: Stage }) {
   await connectDb();
   const [job, photos, tasks] = await Promise.all([
     Job.findById(jobId).select("workNumber status").lean(),
@@ -68,7 +68,8 @@ export default async function JobPhotos({ jobId, viewer, title = "Photos" }: { j
       </div>
 
       {tasks
-        .sort((a, b) => a.stage.localeCompare(b.stage) * -1)
+        .filter((t) => !stage || t.stage === stage)
+        .sort((a, b) => STAGES.indexOf(a.stage as Stage) - STAGES.indexOf(b.stage as Stage))
         .map((t) => {
           const finished = photos.filter((p) => p.kind === "FINISHED" && p.taskId?.equals(t._id));
           const mine = t.assignedOperatorId?.toString() === viewer.id;

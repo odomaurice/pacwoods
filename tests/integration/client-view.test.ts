@@ -47,7 +47,7 @@ describe.skipIf(!hasDatabase)("client job view (MongoDB)", () => {
     const second = await job(false);
     const v = (await clientJobView(client.userId, second.workNumber))!;
     const s = state(v.steps);
-    expect(s).toMatchObject({ registered: "done", approved: "done", materials: "done", "cut-start": "current", "edge-start": "na", "edge-done": "na" });
+    expect(s).toMatchObject({ registered: "done", approved: "done", materials: "done", "cut-start": "current", "cnc-start": "na", "cnc-done": "na", "edge-start": "na", "edge-done": "na" });
     const cutStep = v.steps.find((x) => x.key === "cut-start")!;
     // Nobody has taken it yet: operators take work by starting it.
     expect(cutStep.detail).toContain("Cutting operator: the first free operator");

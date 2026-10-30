@@ -44,7 +44,7 @@ export default async function AdminOverview() {
           data={c}
           counts={{ unassigned: d.kpis.unassigned, issues: d.kpis.openIssues, awaitingMaterial: d.byStatus.AWAITING_MATERIAL ?? 0 }}
         />
-        <QueueSnapshots cutting={c.cutting} edging={c.edging} />
+        <QueueSnapshots cutting={c.cutting} cnc={c.cnc} edging={c.edging} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

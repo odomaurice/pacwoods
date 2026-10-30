@@ -52,6 +52,7 @@ type PartRow = {
   materialId: string;
   grain: PartGrain;
   edges: Edges;
+  machining: string;
 };
 
 type StockRow = {
@@ -73,6 +74,7 @@ const blankPart = (ref: string): PartRow => ({
   materialId: "",
   grain: "NONE",
   edges: NO_EDGES,
+  machining: "",
 });
 const blankStock = (ref: string): StockRow => ({ ref, label: "", length: "", width: "", quantity: "", materialId: "", grained: false });
 
@@ -114,6 +116,7 @@ function toPart(r: PartRow, unit: LengthUnit) {
     materialId: r.materialId || undefined,
     grain: r.grain,
     edges: r.edges,
+    machining: r.machining.trim() || undefined,
   };
 }
 function toStock(r: StockRow, unit: LengthUnit) {
@@ -136,6 +139,7 @@ export default function CutlistEditor({
   materials,
   readOnly,
   preview,
+  cnc = false,
 }: {
   workNumber: string;
   initial: CutlistInput;
@@ -143,6 +147,8 @@ export default function CutlistEditor({
   readOnly: boolean;
   /** The last generated plan, shown beside the cutlist. */
   preview: PreviewData | null;
+  /** The job includes CNC machining: each panel can carry machining notes. */
+  cnc?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -163,6 +169,7 @@ export default function CutlistEditor({
         materialId: p.materialId ?? "",
         grain: p.grain,
         edges: p.edges,
+        machining: p.machining ?? "",
       })),
       "P",
       blankPart,
@@ -339,6 +346,17 @@ export default function CutlistEditor({
                     <EdgePicker value={row.edges} disabled={readOnly} onChange={(edges) => update({ edges })} />
                     {!readOnly && <RemoveButton label={`Remove ${row.label || row.ref}`} onClick={() => setParts(parts.filter((_, j) => j !== i))} />}
                   </div>
+                )}
+                {!blank && cnc && (
+                  <input
+                    aria-label="CNC machining notes"
+                    className={cell}
+                    value={row.machining}
+                    maxLength={300}
+                    placeholder="CNC: e.g. 2 hinge holes 35 mm, 22 mm from the edge; groove for the back"
+                    disabled={readOnly}
+                    onChange={(e) => update({ machining: e.target.value })}
+                  />
                 )}
               </EntryRow>
             );

@@ -13,7 +13,7 @@ export type JobCardData = {
   status: JobStatus;
   createdAt: Date;
   title?: string | null;
-  operations: { cutting: boolean; edging: boolean };
+  operations: { cutting: boolean; edging: boolean; cnc?: boolean | null };
   clientNotes?: string | null;
   internalNotes?: string | null;
   client: { name: string; businessName?: string | null; clientNumber: string; contact?: string | null };
@@ -106,6 +106,7 @@ export default async function JobCard({
           <dt className="text-muted-foreground">Work requested</dt>
           <dd className="flex gap-3 font-medium">
             <Tick on={data.operations.cutting}>Cutting</Tick>
+            <Tick on={Boolean(data.operations.cnc)}>CNC</Tick>
             <Tick on={data.operations.edging}>Edging</Tick>
           </dd>
         </div>

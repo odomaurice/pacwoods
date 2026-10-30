@@ -1,4 +1,4 @@
-import type { Metadata, Route } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -43,7 +43,7 @@ export default async function OperatorTaskPage({ params }: { params: Promise<{ i
       />
       {card && (
         <div className="mb-6">
-          <JobSummaryCard data={card.data} scanUrl={await scanUrl(card.qrToken)} />
+          <JobSummaryCard data={card.data} scanUrl={await scanUrl(card.qrToken)} stage={task.stage} />
         </div>
       )}
       {canAct && task.status !== "COMPLETED" && (
@@ -60,10 +60,10 @@ export default async function OperatorTaskPage({ params }: { params: Promise<{ i
           />
         </div>
       )}
-      <div className="mb-6">
-        <JobPhotos jobId={job._id} viewer={user} />
-      </div>
       <TaskDetail {...props} />
+      <div className="mt-6">
+        <JobPhotos jobId={job._id} viewer={user} stage={task.stage} />
+      </div>
     </>
   );
 }

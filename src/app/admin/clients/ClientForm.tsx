@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clientAccountSchema, type ClientAccountInput } from "@/lib/schemas";
 
-export default function ClientForm() {
+export default function ClientForm({ wizard = false }: { /** Inside the new-job flow: continue to the job, not back to the client list. */ wizard?: boolean } = {}) {
   const [created, setCreated] = useState<Extract<CreatedAccount, { ok: true }>>();
   const [serverError, setServerError] = useState<string>();
   const [pending, startTransition] = useTransition();
@@ -46,7 +46,12 @@ export default function ClientForm() {
           password={created.temporaryPassword}
           extra={created.clientNumber}
         />
-        <div className="flex flex-wrap gap-2">
+        {wizard && created.clientId && (
+          <Link href={`/admin/jobs/new?client=${created.clientId}`} className={buttonVariants({ variant: "gold", className: "h-11 w-full" })}>
+            Continue: job details →
+          </Link>
+        )}
+        <div className={wizard ? "hidden" : "flex flex-wrap gap-2"}>
           {created.clientId && (
             <Link href={`/admin/clients/${created.clientId}/card`} className={buttonVariants()}>
               Print client card

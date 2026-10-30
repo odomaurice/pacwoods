@@ -13,6 +13,7 @@ import { staffAccountSchema, type StaffAccountInput } from "@/lib/schemas";
 
 const CAPABILITY_TEXT = {
   CUTTING: "Cutting — can work the cutting queue",
+  CNC: "CNC machining — can work the CNC queue",
   EDGING: "Edging — can work the edging queue",
 } as const;
 
@@ -82,7 +83,7 @@ export default function StaffAccountForm({ role, backHref }: { role: "ADMIN" | "
       {role === "OPERATOR" && (
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Capabilities</legend>
-          {(["CUTTING", "EDGING"] as const).map((c) => (
+          {(["CUTTING", "CNC", "EDGING"] as const).map((c) => (
             <label key={c} className="flex min-h-11 items-center gap-3 text-sm">
               <input type="checkbox" value={c} className="size-5 accent-brand-charcoal" {...register("capabilities")} />
               {CAPABILITY_TEXT[c]}

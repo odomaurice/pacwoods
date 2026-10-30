@@ -36,6 +36,8 @@ export async function clientJobView(clientUserId: string, workNumber: string) {
   const last = (type: string) => [...events].reverse().find((e) => e.type === type)?.at;
   const task = (stage: Stage) => tasks.find((t) => t.stage === stage);
   const cut = task("CUTTING");
+  const machine = task("CNC");
+  const cnc = Boolean(job.operations?.cnc);
   const edge = task("EDGING");
   const edging = Boolean(job.operations?.edging);
 
@@ -65,13 +67,15 @@ export async function clientJobView(clientUserId: string, workNumber: string) {
       detail: [stageDetail(cut, "Cutting"), ahead !== undefined ? `${ahead} job${ahead === 1 ? "" : "s"} ahead in the cutting queue` : undefined].filter(Boolean).join(" · "),
     },
     { key: "cut-done", label: "Cutting completed", done: cut?.status === "COMPLETED", at: cut?.completedAt ?? undefined, detail: stageDetail(cut, "Cutting") },
+    { key: "cnc-start", label: "CNC machining started", done: Boolean(machine?.firstStartedAt), at: machine?.firstStartedAt ?? undefined, detail: cnc ? stageDetail(machine, "CNC") : undefined, na: !cnc },
+    { key: "cnc-done", label: "CNC machining completed", done: machine?.status === "COMPLETED", at: machine?.completedAt ?? undefined, detail: cnc ? stageDetail(machine, "CNC") : undefined, na: !cnc },
     { key: "edge-start", label: "Edging started", done: Boolean(edge?.firstStartedAt), at: edge?.firstStartedAt ?? undefined, detail: edging ? stageDetail(edge, "Edging") : undefined, na: !edging },
     { key: "edge-done", label: "Edging completed", done: edge?.status === "COMPLETED", at: edge?.completedAt ?? undefined, detail: edging ? stageDetail(edge, "Edging") : undefined, na: !edging },
     { key: "completed", label: "Ready for collection", done: job.status === "COMPLETED", at: first("JOB_COMPLETED") },
   ];
   let currentSet = false;
   const steps: Step[] = raw.map(({ done, na, ...s }) => {
-    if (na) return { ...s, state: "na", detail: "Not applicable: no edging on this job" };
+    if (na) return { ...s, state: "na", detail: `Not applicable: no ${s.key.startsWith("cnc") ? "CNC machining" : "edging"} on this job` };
     if (done) return { ...s, state: "done" };
     if (!currentSet && job.status !== "CANCELLED") {
       currentSet = true;

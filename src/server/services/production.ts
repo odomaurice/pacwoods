@@ -1,7 +1,7 @@
 import "server-only";
 import mongoose, { type ClientSession, type QueryFilter, type Types } from "mongoose";
 import { z } from "zod";
-import { completionSchema, eligibility, type CompletionInput, type QueueItem, type Stage } from "@/lib/production";
+import { STAGE_LABELS, STAGE_STATUS, completionSchema, eligibility, nextStage, type CompletionInput, type QueueItem, type Stage, stageNoun } from "@/lib/production";
 
 export type { CompletionInput };
 import { connectDb } from "@/server/db/connect";
@@ -18,7 +18,7 @@ import { recordJobEvent, transitionJob } from "@/server/workflow/transitions";
 
 type Operator = { id: string; role: string };
 
-const STAGE_WORD: Record<Stage, string> = { CUTTING: "Cutting", EDGING: "Edging" };
+const STAGE_WORD: Record<Stage, string> = STAGE_LABELS;
 
 function oid(id: string) {
   if (!mongoose.isValidObjectId(id)) throw new ServiceError("NOT_FOUND", "Task not found.");
@@ -35,7 +35,7 @@ async function loadTask(taskId: string, session?: ClientSession) {
 async function assertOperatorCan(operatorId: string | Types.ObjectId, stage: Stage, session?: ClientSession) {
   const op = await User.findById(operatorId).select("role status capabilities name").session(session ?? null).lean();
   if (!op || op.role !== "OPERATOR" || op.status !== "ACTIVE") throw new ServiceError("FORBIDDEN", "That operator is not active.");
-  if (!op.capabilities.includes(stage)) throw new ServiceError("FORBIDDEN", `That operator is not set up for ${STAGE_WORD[stage].toLowerCase()}.`);
+  if (!op.capabilities.includes(stage)) throw new ServiceError("FORBIDDEN", `That operator is not set up for ${stageNoun(stage)}.`);
   return op;
 }
 
@@ -152,8 +152,8 @@ export async function startTask(operator: Operator, taskId: string) {
       const word = STAGE_WORD[task.stage as Stage];
       const event = { type: `${task.stage}_${resuming ? "RESUMED" : "STARTED"}`, actorId: operator.id, note: `${word} ${resuming ? "resumed" : "started"}` };
       if (!resuming && !task.firstStartedAt) {
-        const [from, to] = task.stage === "CUTTING" ? (["QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS"] as const) : (["QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS"] as const);
-        await transitionJob(task.jobId, from, to, event, session);
+        const { queued, active } = STAGE_STATUS[task.stage as Stage];
+        await transitionJob(task.jobId, queued, active, event, session);
       } else {
         await recordJobEvent(task.jobId, event, session);
       }
@@ -232,19 +232,20 @@ export async function completeTask(operator: Operator, taskId: string, input: Co
       session,
     );
 
-    if (task.stage === "CUTTING" && job.operations?.edging) {
-      const seq = await nextSequence("queue:edging", session);
+    // Hand the job to its next stage (CNC, then edging), or finish it.
+    const next = nextStage(job.operations, task.stage as Stage);
+    if (next) {
+      const seq = await nextSequence(`queue:${next.toLowerCase()}`, session);
       const released = await ProductionTask.updateOne(
-        { jobId: job._id, stage: "EDGING", status: "BLOCKED" },
+        { jobId: job._id, stage: next, status: "BLOCKED" },
         { $set: { status: "QUEUED", queueSeq: seq, queuedAt: now } },
         { session },
       );
-      if (released.modifiedCount !== 1) throw new ServiceError("CONFLICT", "The edging stage for this job is missing.");
-      await notifyStageOperators("EDGING", task.workNumber, session);
-      await transitionJob(job._id, "CUTTING_IN_PROGRESS", "QUEUED_FOR_EDGING", event, session);
+      if (released.modifiedCount !== 1) throw new ServiceError("CONFLICT", `The ${stageNoun(next)} stage for this job is missing.`);
+      await notifyStageOperators(next, task.workNumber, session);
+      await transitionJob(job._id, STAGE_STATUS[task.stage as Stage].active, STAGE_STATUS[next].queued, event, session);
     } else {
-      const from = task.stage === "CUTTING" ? "CUTTING_IN_PROGRESS" : "EDGING_IN_PROGRESS";
-      await transitionJob(job._id, from, "COMPLETED", event, session);
+      await transitionJob(job._id, STAGE_STATUS[task.stage as Stage].active, "COMPLETED", event, session);
       await recordJobEvent(job._id, { type: "JOB_COMPLETED", actorId: operator.id, note: "All work finished" }, session);
     }
   });

@@ -24,11 +24,14 @@ export default function PlanViewer({
   parts,
   stockLabels,
   showLabels,
+  compact = false,
 }: {
   sheets: PlanSheet[];
   parts: DrawPart[];
   stockLabels: Record<string, string>;
   showLabels: boolean;
+  /** Smaller drawings, two sheets to a row on wide screens. */
+  compact?: boolean;
 }) {
   const narrow = useSyncExternalStore(subscribe, () => window.matchMedia(NARROW).matches, () => false);
   const [orientation, setOrientation] = useState<"auto" | "landscape" | "portrait">("auto");
@@ -59,6 +62,7 @@ export default function PlanViewer({
         <Tool label={portrait ? "Show landscape" : "Show portrait"} pressed={portrait} onClick={() => setOrientation(portrait ? "landscape" : "portrait")} icon={RotateClockwiseIcon} />
       </div>
 
+      <div className={cn("space-y-6", compact && "grid gap-4 space-y-0 lg:grid-cols-2")}>
       {groups.map((g) => {
         const sheet = g.sheets[0];
         const rows = cutRows(sheet, label);
@@ -136,6 +140,7 @@ export default function PlanViewer({
           </section>
         );
       })}
+      </div>
     </div>
   );
 }

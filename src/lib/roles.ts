@@ -5,7 +5,7 @@ export type Role = (typeof ROLES)[number];
 export const PERMISSIONS = ["operators.manage"] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const CAPABILITIES = ["CUTTING", "EDGING"] as const;
+export const CAPABILITIES = ["CUTTING", "CNC", "EDGING"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {

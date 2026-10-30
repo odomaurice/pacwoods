@@ -30,7 +30,7 @@ export async function staffDashboard(now = new Date()) {
     // A completed job is not modified again, so updatedAt is its completion time.
     Job.countDocuments({ status: "COMPLETED", updatedAt: { $gte: since30 } }),
     ProductionTask.countDocuments({ status: { $in: ["QUEUED", "PAUSED"] }, assignedOperatorId: null }),
-    ProductionTask.aggregate<{ _id: { op: string; stage: "CUTTING" | "EDGING" }; count: number }>([
+    ProductionTask.aggregate<{ _id: { op: string; stage: "CUTTING" | "CNC" | "EDGING" }; count: number }>([
       { $match: { status: { $in: ["BLOCKED", "QUEUED", "IN_PROGRESS", "PAUSED"] }, assignedOperatorId: { $ne: null } } },
       { $group: { _id: { op: "$assignedOperatorId", stage: "$stage" }, count: { $sum: 1 } } },
     ]),
@@ -52,15 +52,16 @@ export async function staffDashboard(now = new Date()) {
 
   const operators = await User.find({ _id: { $in: [...new Set(load.map((l) => l._id.op))] } }).select("name").lean();
   const opName = new Map(operators.map((o) => [o._id.toString(), o.name]));
-  const loadMap = new Map<string, { id: string; name: string; cutting: number; edging: number }>();
+  const loadMap = new Map<string, { id: string; name: string; cutting: number; cnc: number; edging: number }>();
   for (const l of load) {
     const id = l._id.op.toString();
-    const row = loadMap.get(id) ?? { id, name: opName.get(id) ?? "Unknown", cutting: 0, edging: 0 };
+    const row = loadMap.get(id) ?? { id, name: opName.get(id) ?? "Unknown", cutting: 0, cnc: 0, edging: 0 };
     if (l._id.stage === "CUTTING") row.cutting += l.count;
+    else if (l._id.stage === "CNC") row.cnc += l.count;
     else row.edging += l.count;
     loadMap.set(id, row);
   }
-  const workload = [...loadMap.values()].sort((a, b) => b.cutting + b.edging - (a.cutting + a.edging));
+  const workload = [...loadMap.values()].sort((a, b) => b.cutting + b.cnc + b.edging - (a.cutting + a.cnc + a.edging));
 
   const sheetsByMaterial = new Map<string, number>();
   for (const v of approved) {
@@ -74,8 +75,8 @@ export async function staffDashboard(now = new Date()) {
   return {
     kpis: {
       active: statusRows.filter((r) => r._id !== "COMPLETED" && r._id !== "CANCELLED").reduce((a, r) => a + r.count, 0),
-      inProduction: n("CUTTING_IN_PROGRESS") + n("EDGING_IN_PROGRESS"),
-      waitingInQueues: n("QUEUED_FOR_CUTTING") + n("QUEUED_FOR_EDGING"),
+      inProduction: n("CUTTING_IN_PROGRESS") + n("CNC_IN_PROGRESS") + n("EDGING_IN_PROGRESS"),
+      waitingInQueues: n("QUEUED_FOR_CUTTING") + n("QUEUED_FOR_CNC") + n("QUEUED_FOR_EDGING"),
       unassigned,
       openIssues,
       completed30: completed30,
@@ -124,7 +125,7 @@ export async function operatorDashboard(operatorId: string, now = new Date()) {
 /** The lists behind "Needs attention", the queue snapshots and recent activity. */
 export async function commandCentre() {
   await connectDb();
-  const [unassigned, issues, awaitingMaterial, events, cutting, edging] = await Promise.all([
+  const [unassigned, issues, awaitingMaterial, events, cutting, cnc, edging] = await Promise.all([
     ProductionTask.find({ status: { $in: ["QUEUED", "PAUSED"] }, assignedOperatorId: null })
       .sort({ queueSeq: 1, createdAt: 1 })
       .limit(6)
@@ -134,11 +135,12 @@ export async function commandCentre() {
     Job.find({ status: "AWAITING_MATERIAL" }).sort({ updatedAt: 1 }).limit(6).select("workNumber title updatedAt").lean(),
     JobStatusEvent.find().sort({ at: -1 }).limit(12).lean(),
     ProductionTask.find({ stage: "CUTTING", status: { $in: ["QUEUED", "IN_PROGRESS", "PAUSED"] } }).sort({ queueSeq: 1 }).limit(6).lean(),
+    ProductionTask.find({ stage: "CNC", status: { $in: ["QUEUED", "IN_PROGRESS", "PAUSED"] } }).sort({ queueSeq: 1 }).limit(6).lean(),
     ProductionTask.find({ stage: "EDGING", status: { $in: ["QUEUED", "IN_PROGRESS", "PAUSED"] } }).sort({ queueSeq: 1 }).limit(6).lean(),
   ]);
   const [jobs, people] = await Promise.all([
     Job.find({ _id: { $in: events.map((e) => e.jobId) } }).select("workNumber").lean(),
-    User.find({ _id: { $in: [...events.map((e) => e.actorId), ...cutting.map((t) => t.assignedOperatorId), ...edging.map((t) => t.assignedOperatorId)].filter(Boolean) } })
+    User.find({ _id: { $in: [...events.map((e) => e.actorId), ...cutting.map((t) => t.assignedOperatorId), ...cnc.map((t) => t.assignedOperatorId), ...edging.map((t) => t.assignedOperatorId)].filter(Boolean) } })
       .select("name")
       .lean(),
   ]);
@@ -158,6 +160,7 @@ export async function commandCentre() {
     issues: issues.map((i) => ({ id: i._id.toString(), workNumber: i.workNumber, category: i.category, reporterRole: i.reporterRole, at: i.createdAt })),
     awaitingMaterial: awaitingMaterial.map((j) => ({ workNumber: j.workNumber, title: j.title, since: j.updatedAt })),
     cutting: snapshot(cutting),
+    cnc: snapshot(cnc),
     edging: snapshot(edging),
     activity: events.map((e) => ({
       id: e._id.toString(),

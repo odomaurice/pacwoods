@@ -17,7 +17,9 @@ const ALLOWED: Partial<Record<JobStatus, JobStatus[]>> = {
   AWAITING_MATERIAL: ["DRAFT", "QUEUED_FOR_CUTTING", "CANCELLED"],
   // Before an operator starts: reopen the cutlist, or withdraw the material.
   QUEUED_FOR_CUTTING: ["DRAFT", "AWAITING_MATERIAL", "CUTTING_IN_PROGRESS", "CANCELLED"],
-  CUTTING_IN_PROGRESS: ["QUEUED_FOR_EDGING", "COMPLETED"],
+  CUTTING_IN_PROGRESS: ["QUEUED_FOR_CNC", "QUEUED_FOR_EDGING", "COMPLETED"],
+  QUEUED_FOR_CNC: ["CNC_IN_PROGRESS"],
+  CNC_IN_PROGRESS: ["QUEUED_FOR_EDGING", "COMPLETED"],
   QUEUED_FOR_EDGING: ["EDGING_IN_PROGRESS"],
   EDGING_IN_PROGRESS: ["COMPLETED"],
 };
@@ -71,7 +73,7 @@ export async function recordJobEvent(jobId: Types.ObjectId, event: EventInfo, se
  * does not send it to the back of the queue.
  */
 export async function queueForCutting(
-  job: { _id: Types.ObjectId; workNumber: string; operations?: { edging: boolean } | null; cuttingQueueSeq?: number | null },
+  job: { _id: Types.ObjectId; workNumber: string; operations?: { edging: boolean; cnc?: boolean | null } | null; cuttingQueueSeq?: number | null },
   from: JobStatus,
   event: EventInfo,
   session?: ClientSession,
@@ -88,9 +90,11 @@ export async function queueForCutting(
     { upsert: true, session },
   );
   await notifyStageOperators("CUTTING", job.workNumber, session);
-  if (job.operations?.edging) {
+  // Later stages exist, waiting, so operators can see the job coming.
+  for (const stage of ["CNC", "EDGING"] as const) {
+    if (stage === "CNC" ? !job.operations?.cnc : !job.operations?.edging) continue;
     await ProductionTask.updateOne(
-      { jobId: job._id, stage: "EDGING" },
+      { jobId: job._id, stage },
       { $setOnInsert: { status: "BLOCKED", workNumber: job.workNumber } },
       { upsert: true, session },
     );

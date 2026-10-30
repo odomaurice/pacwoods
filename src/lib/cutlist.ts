@@ -35,6 +35,8 @@ export const cutlistPartSchema = z.object({
   materialId: z.string().max(40).optional(),
   grain: z.enum(PART_GRAINS),
   edges: edgesSchema,
+  /** What the CNC does to this panel (holes, grooves, routing); does not change the layout. */
+  machining: z.string().trim().max(300).optional(),
 });
 
 export const cutlistStockSchema = z.object({
@@ -188,7 +190,7 @@ export function formatMinutes(min: number): string {
 
 /** Drops stored material snapshots, leaving exactly the editable fields. */
 export function pickPart(p: CutlistPart): CutlistPart {
-  return { ref: p.ref, label: p.label, length: p.length, width: p.width, quantity: p.quantity, materialId: p.materialId, grain: p.grain, edges: p.edges };
+  return { ref: p.ref, label: p.label, length: p.length, width: p.width, quantity: p.quantity, materialId: p.materialId, grain: p.grain, edges: p.edges, machining: p.machining };
 }
 export function pickStock(s: CutlistStock): CutlistStock {
   return { ref: s.ref, label: s.label, length: s.length, width: s.width, quantity: s.quantity, materialId: s.materialId, grained: s.grained };

@@ -20,7 +20,7 @@ import { clientJobView } from "@/server/services/clientView";
 export const metadata: Metadata = { title: "Overview | Pacwoods" };
 
 const when = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
-const ACTIVE = ["DRAFT", "AWAITING_APPROVAL", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS", "AWAITING_EDGING", "QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS", "AWAITING_QUALITY_CHECK", "ON_HOLD"];
+const ACTIVE = ["DRAFT", "AWAITING_APPROVAL", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING", "CUTTING_IN_PROGRESS", "QUEUED_FOR_CNC", "CNC_IN_PROGRESS", "AWAITING_EDGING", "QUEUED_FOR_EDGING", "EDGING_IN_PROGRESS", "AWAITING_QUALITY_CHECK", "ON_HOLD"];
 
 /** The client's home: where each of their jobs is, from real events only. */
 export default async function ClientOverview() {
@@ -39,7 +39,7 @@ export default async function ClientOverview() {
     Issue.countDocuments({ reportedBy: user.id, status: "OPEN" }),
   ]);
   const workNumberOf = new Map(jobs.map((j) => [j._id.toString(), j.workNumber]));
-  const inProduction = jobs.filter((j) => ["CUTTING_IN_PROGRESS", "EDGING_IN_PROGRESS", "QUEUED_FOR_CUTTING", "QUEUED_FOR_EDGING"].includes(j.status)).length;
+  const inProduction = jobs.filter((j) => ["CUTTING_IN_PROGRESS", "CNC_IN_PROGRESS", "EDGING_IN_PROGRESS", "QUEUED_FOR_CUTTING", "QUEUED_FOR_CNC", "QUEUED_FOR_EDGING"].includes(j.status)).length;
 
   return (
     <div className="space-y-6">

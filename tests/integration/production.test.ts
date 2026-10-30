@@ -22,7 +22,7 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
   let phone = 100;
   const done = { quantityCompleted: 2, wastePanels: 0, defectivePanels: 0, downtimeMin: 0 };
 
-  const mk = async (name: string, capabilities: ("CUTTING" | "EDGING")[] = ["CUTTING"]): Promise<Op> => ({
+  const mk = async (name: string, capabilities: ("CUTTING" | "CNC" | "EDGING")[] = ["CUTTING"]): Promise<Op> => ({
     id: (await provisionAccount(root, { role: "OPERATOR", name, phone: `+23480600${String(phone++).padStart(5, "0")}`, capabilities })).user._id.toString(),
     role: "OPERATOR",
   });
@@ -158,6 +158,38 @@ describe.skipIf(!hasDatabase)("production queues (MongoDB)", () => {
 
     const types = (await JobStatusEvent.find({ jobId: job._id }).sort({ at: 1 }).lean()).map((e) => e.type);
     expect(types).toEqual(expect.arrayContaining(["CUTTING_STARTED", "CUTTING_COMPLETED", "EDGING_STARTED", "EDGING_COMPLETED", "JOB_COMPLETED"]));
+  });
+
+  it("runs cutting, then CNC machining, then edging, each for operators with that skill", async () => {
+    const machinist = await mk("Machinist", ["CNC"]);
+    const edger = await mk("Edger2", ["EDGING"]);
+    const job = await createJob(root, { clientId, cutting: true, cnc: true, edging: true, materialsAvailable: true });
+    await generatePlan(root, job.workNumber, {
+      parts: [{ ref: "P1", length: 600, width: 400, quantity: 2, grain: "NONE", edges: NO_EDGES, machining: "2 hinge holes" }],
+      stockSheets: [{ ref: "S1", length: 2440, width: 1220, quantity: 2, grained: false }],
+      options: DEFAULT_OPTIONS,
+    });
+    await approveCutlist(root, job.workNumber);
+    const ids = Object.fromEntries((await ProductionTask.find({ jobId: job._id }).lean()).map((t) => [t.stage, t._id.toString()]));
+    expect(Object.keys(ids).sort()).toEqual(["CNC", "CUTTING", "EDGING"]);
+    await expect(startTask(machinist, ids.CNC)).rejects.toMatchObject({ code: "CONFLICT" }); // waits for cutting
+    await expect(startTask(cutter, ids.CNC)).rejects.toMatchObject({ code: "FORBIDDEN" }); // no CNC skill
+
+    await startTask(cutter, ids.CUTTING);
+    await finish(cutter, ids.CUTTING);
+    expect(await status(job._id)).toBe("QUEUED_FOR_CNC");
+    expect((await task(ids.CNC)).status).toBe("QUEUED");
+    expect((await task(ids.EDGING)).status).toBe("BLOCKED");
+    expect(await Notification.exists({ userId: machinist.id, title: `${job.workNumber} is ready for CNC machining` })).not.toBeNull();
+
+    await startTask(machinist, ids.CNC);
+    expect(await status(job._id)).toBe("CNC_IN_PROGRESS");
+    await finish(machinist, ids.CNC);
+    expect(await status(job._id)).toBe("QUEUED_FOR_EDGING");
+
+    await startTask(edger, ids.EDGING);
+    await finish(edger, ids.EDGING);
+    expect(await status(job._id)).toBe("COMPLETED");
   });
 
   it("tells qualified operators when a job is ready to cut", async () => {

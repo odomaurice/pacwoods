@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import QRCode from "qrcode";
 import type { JobCardData } from "@/components/JobCard";
 import { bandedSides, edgingLength } from "@/lib/cutting/engine";
+import { STAGE_LABELS, type Stage } from "@/lib/production";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +15,7 @@ export default async function JobSummaryCard({
   header,
   children,
   compact = false,
+  stage,
 }: {
   data: JobCardData;
   scanUrl: string;
@@ -21,6 +23,8 @@ export default async function JobSummaryCard({
   children?: ReactNode;
   /** Tighter spacing, a smaller QR code and two columns of facts, for lists. */
   compact?: boolean;
+  /** For an operator: show only what their stage needs. */
+  stage?: Stage;
 }) {
   const qr = await QRCode.toString(scanUrl, { type: "svg", margin: 0, errorCorrectionLevel: "M" });
   const parts = data.cutlist?.parts ?? [];
@@ -30,6 +34,8 @@ export default async function JobSummaryCard({
   const sides = banded.reduce((n, p) => n + bandedSides(p.edges) * p.quantity, 0);
   const materials = [...new Set(parts.map((p) => (p.materialName ? `${p.materialName} ${p.thicknessMm} mm` : "Unspecified")))];
   const sheets = data.cutlist?.plan?.totals.sheetsUsed;
+  const machined = parts.filter((p) => p.machining).reduce((n, p) => n + p.quantity, 0);
+  const show = { work: !stage, material: stage !== "EDGING", panels: !stage || stage === "CUTTING", cnc: stage === "CNC", banding: !stage || stage === "EDGING" };
 
   return (
     <article className="overflow-hidden rounded-lg bg-card">
@@ -48,28 +54,37 @@ export default async function JobSummaryCard({
       </div>
 
       <dl className={cn("grid grid-cols-2", compact ? "gap-x-3 gap-y-2 p-3 text-xs" : "gap-x-4 gap-y-3 p-4 text-sm sm:grid-cols-4")}>
-        <Fact label="Work">
-          <span className={data.operations.cutting ? "" : "text-muted-foreground line-through"}>☑ Cutting</span>{" "}
-          <span className={data.operations.edging ? "" : "text-muted-foreground line-through"}>{data.operations.edging ? "☑" : "☐"} Edging</span>
-        </Fact>
-        <Fact label="Material">{materials.join(", ") || "—"}</Fact>
-        <Fact label="Panels">
-          {panels}
-          {sheets ? <span className="text-muted-foreground"> · {sheets} sheet{sheets === 1 ? "" : "s"}</span> : null}
-        </Fact>
-        <Fact label="Edge banding">
-          {sides ? (
-            <>
-              {bandedPanels} panels, {sides} sides
-              <span className={cn("text-muted-foreground", !compact && "block")}>
-                {compact && " · "}
-                {(edgingLength(parts) / 1000).toFixed(2)} m
-              </span>
-            </>
-          ) : (
-            "None"
-          )}
-        </Fact>
+        {stage && <Fact label="Your stage">{STAGE_LABELS[stage]}</Fact>}
+        {show.work && (
+          <Fact label="Work">
+            <span className={data.operations.cutting ? "" : "text-muted-foreground line-through"}>☑ Cutting</span>{" "}
+            {data.operations.cnc && <span>☑ CNC </span>}
+            <span className={data.operations.edging ? "" : "text-muted-foreground line-through"}>{data.operations.edging ? "☑" : "☐"} Edging</span>
+          </Fact>
+        )}
+        {show.material && <Fact label="Material">{materials.join(", ") || "—"}</Fact>}
+        {show.cnc && <Fact label="Panels to machine">{machined || "None noted"}</Fact>}
+        {show.panels && (
+          <Fact label="Panels">
+            {panels}
+            {sheets ? <span className="text-muted-foreground"> · {sheets} sheet{sheets === 1 ? "" : "s"}</span> : null}
+          </Fact>
+        )}
+        {show.banding && (
+          <Fact label="Edge banding">
+            {sides ? (
+              <>
+                {bandedPanels} panels, {sides} sides
+                <span className={cn("text-muted-foreground", !compact && "block")}>
+                  {compact && " · "}
+                  {(edgingLength(parts) / 1000).toFixed(2)} m
+                </span>
+              </>
+            ) : (
+              "None"
+            )}
+          </Fact>
+        )}
       </dl>
       {children && <div className={cn("border-t border-border", compact ? "p-3" : "p-4")}>{children}</div>}
     </article>
