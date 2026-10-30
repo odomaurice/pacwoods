@@ -171,3 +171,29 @@ describe("random layouts always validate", () => {
     }
   });
 });
+
+describe("leftover is kept together", () => {
+  const empty = (r: { x: number; y: number; w: number; h: number }, ps: Array<{ x: number; y: number; w: number; h: number }>) =>
+    !ps.some((p) => p.x < r.x + r.w && r.x < p.x + p.w && p.y < r.y + r.h && r.y < p.y + p.h);
+
+  it("leaves one offcut when the panels fill the board's full width", () => {
+    const plan = run([part("Side", 600, 1220, 3)], [sheet("S")], opts({ kerf: 0, edgeTrim: 0 }));
+    expect(plan.sheets[0].offcuts).toEqual([{ x: 1800, y: 0, w: 640, h: 1220 }]);
+  });
+
+  it("never cuts inside leftover, and offcuts never overlap panels", () => {
+    const plan = run([part("A", 700, 500, 3), part("B", 300, 300, 2)], [sheet("S")], opts({ kerf: 4, edgeTrim: 10 }));
+    for (const s of plan.sheets) {
+      for (const c of s.cuts) expect(empty(c.source!, s.placements)).toBe(false);
+      for (const o of s.offcuts) expect(empty(o, s.placements)).toBe(true);
+    }
+  });
+
+  it("prefers the layout with the leftover in fewer, larger pieces", () => {
+    const plan = run([part("Door", 716, 396, 4), part("Shelf", 764, 540, 2)], [sheet("S")], opts({ kerf: 4, edgeTrim: 10 }));
+    const s = plan.sheets[0];
+    const total = s.offcuts.reduce((n, o) => n + o.w * o.h, 0);
+    // Most of the leftover is one usable piece, not scraps spread over the board.
+    expect(s.offcuts[0].w * s.offcuts[0].h).toBeGreaterThan(total * 0.6);
+  });
+});

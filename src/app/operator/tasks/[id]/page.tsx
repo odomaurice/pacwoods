@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -15,7 +15,7 @@ import { loadTaskView } from "@/server/services/taskView";
 
 export const metadata: Metadata = { title: "Job | Pacwoods" };
 
-export default async function OperatorTaskPage({ params }: PageProps<"/operator/tasks/[id]">) {
+export default async function OperatorTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireRole("OPERATOR");
   const { id } = await params;
   // Taken by another operator: it does not exist for this one.

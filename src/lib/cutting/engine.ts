@@ -3,7 +3,9 @@
  *
  * Every placement splits its free rectangle with two straight, edge-to-edge
  * cuts, so each layout can be produced on a panel saw in the recorded order.
- * Several orderings and split rules are tried and the best result kept. This
+ * Several orderings and split rules are tried and the best result kept: the
+ * fewest sheets first, then the leftover kept together in as few, as large
+ * pieces as possible. Cuts that would only divide leftover are not made. This
  * is a heuristic: good layouts, not a proven minimum. `sheetLowerBound` in
  * the totals shows how far from the theoretical floor a plan is.
  */
@@ -20,7 +22,7 @@ import type {
   UnplacedReason,
 } from "./types";
 
-export const ENGINE_VERSION = "guillotine-2";
+export const ENGINE_VERSION = "guillotine-3";
 
 type Item = {
   partRef: string;
@@ -40,7 +42,11 @@ type OpenSheet = {
 };
 
 type SortKey = "area" | "longest" | "perimeter" | "width";
-type FitRule = "shortSide" | "area";
+/**
+ * "corner" packs row by row from the top-left and "column" column by column,
+ * so the leftover gathers at the bottom or the right of the board.
+ */
+type FitRule = "shortSide" | "area" | "corner" | "column";
 type SplitRule = "shorterLeftover" | "longerLeftover";
 
 /** Cut size after optional edge-band deduction. */
@@ -75,6 +81,8 @@ function usable(stock: StockInput, options: CutOptions) {
 function score(rect: Rect, pw: number, ph: number, rule: FitRule) {
   const dw = rect.w - pw;
   const dh = rect.h - ph;
+  if (rule === "corner") return (rect.y * 1e5 + rect.x) * 1e6 + Math.min(dw, dh);
+  if (rule === "column") return (rect.x * 1e5 + rect.y) * 1e6 + Math.min(dw, dh);
   return rule === "shortSide" ? Math.min(dw, dh) * 1e6 + Math.max(dw, dh) : (rect.w * rect.h - pw * ph) * 1e3 + Math.min(dw, dh);
 }
 
@@ -230,7 +238,7 @@ export function expandItems(parts: PartInput[], options: CutOptions): Item[] {
 }
 
 const SORTS: SortKey[] = ["area", "longest", "perimeter", "width"];
-const FITS: FitRule[] = ["shortSide", "area"];
+const FITS: FitRule[] = ["shortSide", "area", "corner", "column"];
 const SPLITS: SplitRule[] = ["shorterLeftover", "longerLeftover"];
 
 export function optimise(parts: PartInput[], stocks: StockInput[], options: CutOptions): Plan {
@@ -242,11 +250,19 @@ export function optimise(parts: PartInput[], stocks: StockInput[], options: CutO
       for (const split of SPLITS) {
         const result = runStrategy(items, stocks, options, sort, fit, split);
         const sheetArea = result.sheets.reduce((a, s) => a + s.stock.length * s.stock.width, 0);
+        // Leftover outside each sheet's largest offcut: scraps. Fewer is better.
+        const scattered = result.sheets.reduce((a, s) => {
+          const offcuts = consolidate(s).offcuts;
+          const total = offcuts.reduce((n, o) => n + o.w * o.h, 0);
+          return a + total - Math.max(0, ...offcuts.map((o) => o.w * o.h));
+        }, 0);
+        const pieces = result.sheets.reduce((a, s) => a + consolidate(s).offcuts.length, 0);
         // Most parts placed, then fewest sheets, then least sheet area, then
-        // the emptiest last sheet (its offcut is the most useful).
+        // the leftover in the fewest pieces, then the least of it in scraps,
+        // then the emptiest last sheet.
         const last = result.sheets.at(-1);
         const lastUsed = last ? last.placements.reduce((a, p) => a + p.w * p.h, 0) : 0;
-        const key = [result.unplaced.length, result.sheets.length, sheetArea, lastUsed];
+        const key = [result.unplaced.length, result.sheets.length, sheetArea, pieces, scattered, lastUsed];
         if (!best || compareKeys(key, best.key) < 0) {
           best = { result, name: `${sort}/${fit}/${split}`, key };
         }
@@ -261,9 +277,28 @@ function compareKeys(a: number[], b: number[]) {
   return 0;
 }
 
+const contains = (outer: Rect, inner: Rect) =>
+  inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+
+/**
+ * Drops cuts that only divide leftover (their piece holds no panel), so the
+ * leftover stays in one piece, and lists the offcuts: the largest empty
+ * pieces the remaining cuts leave.
+ */
+function consolidate(sheet: OpenSheet): { cuts: Cut[]; offcuts: Rect[] } {
+  const holdsPanel = (r: Rect) => sheet.placements.some((p) => contains(r, p));
+  const cuts = sheet.cuts.filter((c) => holdsPanel(c.source!));
+  const offcuts = cuts
+    .flatMap((c) => c.pieces!.filter((r): r is Rect => r !== null))
+    .filter((r) => !holdsPanel(r))
+    .sort((a, b) => b.w * b.h - a.w * a.h);
+  return { cuts, offcuts };
+}
+
 function buildPlan(result: ReturnType<typeof runStrategy>, strategy: string, parts: PartInput[], stocks: StockInput[], options: CutOptions): Plan {
   const sheets: PlanSheet[] = result.sheets.map((s, i) => {
     const usedArea = s.placements.reduce((a, p) => a + p.w * p.h, 0);
+    const { cuts, offcuts } = consolidate(s);
     return {
       index: i + 1,
       stockRef: s.stock.ref,
@@ -271,8 +306,8 @@ function buildPlan(result: ReturnType<typeof runStrategy>, strategy: string, par
       width: s.stock.width,
       materialKey: s.stock.materialKey,
       placements: s.placements,
-      cuts: s.cuts.map((c, order) => ({ ...c, order: order + 1 })),
-      offcuts: [...s.free].sort((a, b) => b.w * b.h - a.w * a.h),
+      cuts: cuts.map((c, order) => ({ ...c, order: order + 1 })),
+      offcuts,
       usedArea,
       utilization: usedArea / (s.stock.length * s.stock.width),
     };

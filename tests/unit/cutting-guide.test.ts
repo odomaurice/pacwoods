@@ -47,7 +47,7 @@ describe("cutting guide", () => {
     // after every cut on the board's remainder.
     const onStrip = (s: (typeof steps)[number]) => s.sourceStep !== null && same(steps[s.sourceStep - 1].cut.pieces![0], s.source);
     const firstStrip = steps.findIndex(onStrip);
-    expect(firstStrip).toBeGreaterThan(1);
+    expect(firstStrip).toBeGreaterThanOrEqual(1);
     for (const s of steps.slice(1, firstStrip)) expect(same(steps[s.sourceStep! - 1].cut.pieces![1], s.source)).toBe(true);
     for (const s of steps.slice(firstStrip)) expect(onStrip(s) || same(steps[s.sourceStep! - 1].cut.pieces![1], s.source)).toBe(true);
   });
