@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatPhone } from "@/lib/identity";
 import AccountActions from "@/components/AccountActions";
 import Detail from "@/components/Detail";
 import EmptyState from "@/components/EmptyState";
@@ -51,7 +52,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clients/[
 
       <dl className="mb-8 grid gap-4 rounded-lg bg-card p-5 sm:grid-cols-2 lg:grid-cols-3">
         <Detail label="Contact">{user.name}</Detail>
-        <Detail label="Phone">{user.phone ?? "—"}</Detail>
+        <Detail label="Phone">{formatPhone(user.phone) || "—"}</Detail>
         <Detail label="Email">{user.email ?? "—"}</Detail>
         <Detail label="Status">
           <AccountStatusBadge status={user.status} />
@@ -72,7 +73,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clients/[
         <AccountActions
           userId={user._id.toString()}
           name={user.name}
-          login={user.phone ?? user.email ?? ""}
+          login={formatPhone(user.phone) || user.email || ""}
           status={user.status}
         />
       </section>

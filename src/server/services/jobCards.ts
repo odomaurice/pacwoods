@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import type { JobCardData } from "@/components/JobCard";
+import { formatPhone } from "@/lib/identity";
 import { connectDb } from "@/server/db/connect";
 import { ClientProfile } from "@/server/db/models/ClientProfile";
 import { Job } from "@/server/db/models/Job";
@@ -36,7 +37,7 @@ export async function getJobCardData(workNumber: string, opts: { ownerUserId?: s
       name: user?.name ?? "",
       businessName: profile.businessName,
       clientNumber: profile.clientNumber,
-      contact: user?.phone ?? user?.email,
+      contact: formatPhone(user?.phone) || user?.email,
     },
     cutlist: chosen
       ? {

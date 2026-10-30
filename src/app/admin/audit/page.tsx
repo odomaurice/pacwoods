@@ -40,6 +40,7 @@ const ACTION_LABELS: Record<string, string> = {
   "payment.client_recorded": "Client payment recorded",
   "payment.operator_recorded": "Operator pay recorded",
   "payment.voided": "Payment entry voided",
+  "job.materials_recorded": "Job materials recorded",
   "issue.resolved": "Issue resolved",
   "photo.deleted": "Photo removed",
   "job.material_confirmed": "Materials confirmed",

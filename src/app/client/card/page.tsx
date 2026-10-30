@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { formatPhone } from "@/lib/identity";
 import ClientCard from "@/components/ClientCard";
 import EmptyState from "@/components/EmptyState";
 import PageHeader from "@/components/PageHeader";
@@ -32,7 +33,7 @@ export default async function MyCardPage() {
           clientNumber={profile.clientNumber}
           name={user.name}
           businessName={profile.businessName}
-          contact={user.phone ?? user.email}
+          contact={formatPhone(user.phone) || user.email}
         />
       ) : (
         <EmptyState title="Your client card is not available. Please contact Pacwoods." />

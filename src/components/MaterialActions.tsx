@@ -12,18 +12,19 @@ export function MaterialsAvailableButton({ workNumber, approved }: { workNumber:
   const router = useRouter();
   return (
     <ConfirmAction
-      label="Materials available"
-      title={`Materials available for ${workNumber}?`}
+      large
+      label="Mark materials as received"
+      title={`Are the boards for ${workNumber} in the workshop?`}
       description={
         approved
-          ? "Confirm the boards for this job are in the workshop. The job joins the cutting queue now."
-          : "Confirm the boards for this job are in the workshop. The job will join the cutting queue as soon as its cutlist is approved."
+          ? "Only confirm once the boards are physically here. The job goes into the cutting queue straight away."
+          : "Only confirm once the boards are physically here. The job goes into the cutting queue as soon as its cutlist is approved."
       }
-      confirmLabel="Confirm"
+      confirmLabel="Yes, they are here"
       onConfirm={async () => {
         const result = await confirmMaterialsAction(workNumber);
         if (result.ok) {
-          toast.success(approved ? "Materials confirmed. The job is in the cutting queue." : "Materials confirmed.");
+          toast.success(approved ? "Materials received. The job is in the cutting queue." : "Materials received.");
           router.refresh();
         } else toast.error(result.error);
       }}
@@ -36,27 +37,27 @@ export function MaterialsNotAvailableButton({ workNumber, queued }: { workNumber
   const [reason, setReason] = useState("");
   return (
     <ConfirmAction
-      label="Materials not available"
+      label="Not received after all"
       destructive
-      title={`Withdraw the materials confirmation for ${workNumber}?`}
+      title={`Mark the boards for ${workNumber} as not received?`}
       description={
         <span className="block space-y-2">
           <span className="block">
             {queued
-              ? "The job leaves the cutting queue until materials are confirmed again. It keeps its original place in the order."
-              : "The confirmation is removed."}
+              ? "The job leaves the cutting queue until the boards arrive. It keeps its original place in the order."
+              : "The job goes back to waiting for materials."}
           </span>
           <span className="block space-y-1.5 text-left">
-            <Label htmlFor="withdraw-reason">Reason (recorded)</Label>
+            <Label htmlFor="withdraw-reason">Why? (recorded on the timeline)</Label>
             <Textarea id="withdraw-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
           </span>
         </span>
       }
-      confirmLabel="Withdraw"
+      confirmLabel="Mark as not received"
       onConfirm={async () => {
         const result = await withdrawMaterialsAction(workNumber, reason);
         if (result.ok) {
-          toast.success("Materials confirmation withdrawn.");
+          toast.success("Marked as not received.");
           setReason("");
           router.refresh();
         } else toast.error(result.error);

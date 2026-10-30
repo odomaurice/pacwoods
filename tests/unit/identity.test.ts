@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeEmail, normalizePhone, parseIdentifier } from "@/lib/identity";
+import { formatPhone, normalizeEmail, normalizePhone, parseIdentifier } from "@/lib/identity";
 
 describe("normalizePhone", () => {
   it("keeps international numbers, stripping formatting", () => {
@@ -10,7 +10,21 @@ describe("normalizePhone", () => {
 
   it("uses the default calling code only for national numbers", () => {
     expect(normalizePhone("08012345678", "234")).toBe("+2348012345678");
-    expect(normalizePhone("08012345678", undefined)).toBeNull();
+    expect(normalizePhone("08012345678", "")).toBeNull();
+  });
+
+  it("defaults to Nigeria, with or without the leading 0", () => {
+    expect(normalizePhone("0803 123 4567")).toBe("+2348031234567");
+    expect(normalizePhone("803 123 4567")).toBe("+2348031234567");
+    expect(normalizePhone("+44 7700 900123")).toBe("+447700900123");
+  });
+});
+
+describe("formatPhone", () => {
+  it("shows local numbers the local way, others as stored", () => {
+    expect(formatPhone("+2348031234567")).toBe("0803 123 4567");
+    expect(formatPhone("+447700900123")).toBe("+447700900123");
+    expect(formatPhone(undefined)).toBe("");
   });
 
   it("rejects implausible numbers", () => {

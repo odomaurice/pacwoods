@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatPhone } from "@/lib/identity";
 import ClientCard from "@/components/ClientCard";
 import PrintButton from "@/components/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export default async function ClientCardPage({ params }: PageProps<"/admin/clien
         clientNumber={profile.clientNumber}
         name={user.name}
         businessName={profile.businessName}
-        contact={user.phone ?? user.email}
+        contact={formatPhone(user.phone) || user.email}
       />
     </div>
   );

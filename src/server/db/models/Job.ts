@@ -1,6 +1,7 @@
 import { Schema, type InferSchemaType, type Model } from "mongoose";
 import { defineModel } from "@/server/db/model";
 import { JOB_STATUSES } from "@/lib/jobs";
+import { SUPPLIED_BY } from "@/lib/job-materials";
 import { CLIENT_PAYMENT_STATUS } from "@/lib/payments";
 
 /**
@@ -27,6 +28,25 @@ const jobSchema = new Schema(
     /** Set when staff confirm the boards are in the workshop. */
     materialConfirmedAt: { type: Date },
     materialConfirmedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    /** The boards for this job as staff recorded them (see lib/job-materials). */
+    materials: {
+      type: [
+        new Schema(
+          {
+            materialId: { type: Schema.Types.ObjectId, ref: "Material" },
+            name: { type: String, required: true, maxlength: 120 },
+            thicknessMm: { type: Number },
+            sheetLengthMm: { type: Number },
+            sheetWidthMm: { type: Number },
+            sheets: { type: Number, required: true, min: 1 },
+            suppliedBy: { type: String, enum: SUPPLIED_BY },
+            note: { type: String, maxlength: 300 },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
     /**
      * Position in the cutting queue: a server-issued, ever-increasing number
      * assigned the first time the job enters the queue, and kept afterwards.

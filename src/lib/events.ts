@@ -9,6 +9,7 @@ export const EVENT_LABELS: Record<string, string> = {
   OPERATOR_ASSIGNED: "Operator assigned",
   TASK_RELEASED: "Released to the queue",
   PAYMENT_RECORDED: "Client payment recorded",
+  MATERIAL_DETAILS: "Materials recorded",
   OPERATOR_PAID: "Operator paid",
   PAYMENT_VOIDED: "Payment entry voided",
   CUTTING_STARTED: "Cutting started",

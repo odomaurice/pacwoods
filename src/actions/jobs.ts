@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRole } from "@/server/auth/guards";
+import type { JobMaterialInput } from "@/lib/job-materials";
 import type { JobDetailsInput, JobInput } from "@/lib/schemas";
-import { confirmMaterials, createJob, updateDraftJob, withdrawMaterials } from "@/server/services/jobs";
+import { confirmMaterials, createJob, saveJobMaterials, updateDraftJob, withdrawMaterials } from "@/server/services/jobs";
 import { ServiceError } from "@/server/services/users";
 
 export type JobResult = { ok: false; error: string } | undefined;
@@ -59,6 +60,10 @@ async function materialAction(workNumber: string, fn: (actor: Awaited<ReturnType
 
 export async function confirmMaterialsAction(workNumber: string): Promise<MaterialResult> {
   return materialAction(workNumber, (actor) => confirmMaterials(actor, workNumber));
+}
+
+export async function saveJobMaterialsAction(workNumber: string, items: JobMaterialInput[]): Promise<MaterialResult> {
+  return materialAction(workNumber, (actor) => saveJobMaterials(actor, workNumber, items));
 }
 
 export async function withdrawMaterialsAction(workNumber: string, reason: string): Promise<MaterialResult> {

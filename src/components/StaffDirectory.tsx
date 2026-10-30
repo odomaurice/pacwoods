@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPhone } from "@/lib/identity";
 import EmptyState from "@/components/EmptyState";
 import { Pagination, SearchForm, withParams } from "@/components/ListControls";
 import { AccountStatusBadge } from "@/components/StatusBadge";
@@ -51,7 +52,7 @@ export default async function StaffDirectory({
                       {u.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{u.phone ?? "—"}</TableCell>
+                  <TableCell>{formatPhone(u.phone) || "—"}</TableCell>
                   <TableCell>{u.email ?? "—"}</TableCell>
                   <TableCell>
                     {role === "OPERATOR"

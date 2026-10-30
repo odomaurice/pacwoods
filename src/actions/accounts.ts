@@ -10,6 +10,7 @@ import {
   type ClientAccountInput,
   type StaffAccountInput,
 } from "@/lib/schemas";
+import { formatPhone } from "@/lib/identity";
 import { requireRole } from "@/server/auth/guards";
 import {
   ServiceError,
@@ -46,7 +47,7 @@ export async function createStaffAccountAction(input: StaffAccountInput): Promis
     const data = staffAccountSchema.parse(input);
     const { user, temporaryPassword } = await provisionAccount(actor, data);
     revalidatePath(data.role === "ADMIN" ? "/admin/admins" : "/admin/operators");
-    return { ok: true, name: user.name, login: user.phone ?? user.email!, temporaryPassword };
+    return { ok: true, name: user.name, login: formatPhone(user.phone) || user.email!, temporaryPassword };
   } catch (error) {
     return failure(error);
   }
@@ -61,7 +62,7 @@ export async function createClientAction(input: ClientAccountInput): Promise<Cre
     return {
       ok: true,
       name: user.name,
-      login: user.phone ?? user.email!,
+      login: formatPhone(user.phone) || user.email!,
       temporaryPassword,
       clientNumber: profile.clientNumber,
       clientId: profile._id.toString(),

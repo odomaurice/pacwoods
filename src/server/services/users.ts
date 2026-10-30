@@ -1,6 +1,6 @@
 import "server-only";
 import mongoose, { mongo, type ClientSession, type Types } from "mongoose";
-import { normalizeEmail, normalizePhone } from "@/lib/identity";
+import { formatPhone, normalizeEmail, normalizePhone } from "@/lib/identity";
 import { formatClientNumber } from "@/lib/numbers";
 import { canProvision, type Capability, type Permission, type Role } from "@/lib/roles";
 import { generateTemporaryPassword, hashPassword, verifyPassword } from "@/server/auth/password";
@@ -235,7 +235,7 @@ export async function changePassword(userId: string, current: string, next: stri
   await user.save();
   await audit({ actorId: user._id, action: "user.password_changed", targetType: "User", targetId: user._id });
 
-  return { identifier: user.phone ?? user.email! };
+  return { identifier: formatPhone(user.phone) || user.email! };
 }
 
 export const PAGE_SIZE = 20;
@@ -251,7 +251,7 @@ export async function listUsers(roles: Role[], { q = "", page = 1 } = {}) {
   const term = q.trim();
   if (term) {
     const re = new RegExp(escapeRegex(term), "i");
-    filter.$or = [{ name: re }, { email: re }, { phone: re }];
+    filter.$or = [{ name: re }, { email: re }, { phone: re }, { phone: normalizePhone(term) ?? "" }];
   }
   const [rows, total] = await Promise.all([
     User.find(filter)
@@ -270,7 +270,7 @@ export async function listClients({ q = "", page = 1 } = {}) {
   const term = q.trim();
   const re = term ? new RegExp(escapeRegex(term), "i") : null;
   const match = re
-    ? { $or: [{ "user.name": re }, { "user.email": re }, { "user.phone": re }, { clientNumber: re }, { businessName: re }] }
+    ? { $or: [{ "user.name": re }, { "user.email": re }, { "user.phone": re }, { "user.phone": normalizePhone(term) ?? "" }, { clientNumber: re }, { businessName: re }] }
     : {};
 
   const [result] = await ClientProfile.aggregate<{

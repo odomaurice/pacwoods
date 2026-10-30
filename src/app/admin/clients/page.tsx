@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatPhone } from "@/lib/identity";
 import EmptyState from "@/components/EmptyState";
 import { Pagination, SearchForm, listParams, withParams } from "@/components/ListControls";
 import PageHeader from "@/components/PageHeader";
@@ -55,7 +56,7 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                     </Link>
                   </TableCell>
                   <TableCell>{c.businessName ?? "—"}</TableCell>
-                  <TableCell>{c.user.phone ?? c.user.email ?? "—"}</TableCell>
+                  <TableCell>{formatPhone(c.user.phone) || c.user.email || "—"}</TableCell>
                   <TableCell>
                     <AccountStatusBadge status={c.user.status} />
                   </TableCell>

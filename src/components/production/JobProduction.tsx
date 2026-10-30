@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPhone } from "@/lib/identity";
 import Detail from "@/components/Detail";
 import ReleaseTask from "@/components/production/ReleaseTask";
 import { TaskStatusBadge } from "@/components/StatusBadge";
@@ -55,7 +56,7 @@ export default async function JobProduction({ jobId }: { jobId: Types.ObjectId }
                     {op.phone && (
                       <p>
                         <a href={`tel:${op.phone}`} className="underline-offset-4 hover:underline">
-                          {op.phone}
+                          {formatPhone(op.phone)}
                         </a>
                       </p>
                     )}

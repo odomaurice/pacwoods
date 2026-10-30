@@ -72,7 +72,7 @@ export default function StaffAccountForm({ role, backHref }: { role: "ADMIN" | "
           id="phone"
           label="Phone number"
           type="tel"
-          placeholder="+234…"
+          placeholder="e.g. 0803 123 4567"
           error={errors.phone?.message}
           {...register("phone")}
         />

@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import mongoose, { type Types } from "mongoose";
 import type { JobStatus } from "@/lib/jobs";
+import { describeMaterial, jobMaterialsSchema } from "@/lib/job-materials";
 import { jobDetailsSchema, jobSchema, type JobDetailsInput, type JobInput } from "@/lib/schemas";
 import { formatWorkNumber, workNumberCounter } from "@/lib/numbers";
 import { connectDb } from "@/server/db/connect";
@@ -208,6 +209,32 @@ export async function confirmMaterials(actor: Actor, workNumber: string) {
     }
   });
   await audit({ actorId: actor.id, action: "job.material_confirmed", targetType: "Job", targetId: job._id });
+}
+
+/**
+ * Records the boards for a job: what material, how many sheets, who supplied
+ * them. Replaces the whole list; it can be changed at any time, and each save
+ * is on the timeline.
+ */
+export async function saveJobMaterials(actor: Actor, workNumber: string, raw: unknown) {
+  assertStaff(actor);
+  const parsed = jobMaterialsSchema.safeParse(raw);
+  if (!parsed.success) throw new ServiceError("INVALID", parsed.error.issues[0]?.message ?? "Check the materials.");
+  const items = parsed.data.map((m) => ({ ...m, materialId: m.materialId && mongoose.isValidObjectId(m.materialId) ? m.materialId : undefined, note: m.note || undefined }));
+  await connectDb();
+  const job = await Job.findOne({ workNumber }).select("_id status").lean();
+  if (!job) throw new ServiceError("NOT_FOUND", "Job not found.");
+  if (job.status === "CANCELLED") throw new ServiceError("CONFLICT", "This job is cancelled.");
+  const sheets = items.reduce((n, m) => n + m.sheets, 0);
+  await mongoose.connection.transaction(async (session) => {
+    await Job.updateOne({ _id: job._id }, { $set: { materials: items } }, { session });
+    await recordJobEvent(
+      job._id,
+      { type: "MATERIAL_DETAILS", actorId: actor.id, note: items.length ? `Materials recorded: ${items.map((m) => `${describeMaterial(m)} × ${m.sheets}`).join(", ")}` : "Material list cleared", clientVisible: false },
+      session,
+    );
+  });
+  await audit({ actorId: actor.id, action: "job.materials_recorded", targetType: "Job", targetId: job._id, meta: { workNumber, lines: items.length, sheets } });
 }
 
 /** Undo a confirmation made in error. A queued job leaves the queue (keeping its place for later). */

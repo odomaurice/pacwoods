@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import mongoose from "mongoose";
+import { formatPhone } from "@/lib/identity";
 import AccountActions from "@/components/AccountActions";
 import Detail from "@/components/Detail";
 import PageHeader from "@/components/PageHeader";
@@ -56,7 +57,7 @@ export default async function AccountPage({ params }: PageProps<"/admin/accounts
         <Detail label="Status">
           <AccountStatusBadge status={user.status} />
         </Detail>
-        <Detail label="Phone">{user.phone ?? "—"}</Detail>
+        <Detail label="Phone">{formatPhone(user.phone) || "—"}</Detail>
         <Detail label="Email">{user.email ?? "—"}</Detail>
         {user.role === "OPERATOR" && (
           <Detail label="Capabilities">{user.capabilities.map((c) => (c === "CUTTING" ? "Cutting" : "Edging")).join(", ")}</Detail>
@@ -75,7 +76,7 @@ export default async function AccountPage({ params }: PageProps<"/admin/accounts
       <AccountActions
         userId={user._id.toString()}
         name={user.name}
-        login={user.phone ?? user.email ?? ""}
+        login={formatPhone(user.phone) || user.email || ""}
         status={user.status}
       />
     </>

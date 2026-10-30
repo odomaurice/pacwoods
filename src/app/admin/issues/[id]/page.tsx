@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { formatPhone } from "@/lib/identity";
 import Detail from "@/components/Detail";
 import { ResolveIssueButton } from "@/components/issues/IssueButtons";
 import PageHeader from "@/components/PageHeader";
@@ -54,7 +55,7 @@ export default async function IssuePage({ params }: PageProps<"/admin/issues/[id
         <Detail label="Contact">
           {reporter?.phone ? (
             <a href={`tel:${reporter.phone}`} className="underline-offset-4 hover:underline">
-              {reporter.phone}
+              {formatPhone(reporter.phone)}
             </a>
           ) : (
             (reporter?.email ?? "—")

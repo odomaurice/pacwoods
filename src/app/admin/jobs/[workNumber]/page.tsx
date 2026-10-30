@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ApproveCutlistButton, ReopenCutlistButton } from "@/components/cutlist/CutlistActions";
 import Detail from "@/components/Detail";
 import ExportButtons from "@/components/ExportButtons";
-import { MaterialsAvailableButton, MaterialsNotAvailableButton } from "@/components/MaterialActions";
+import JobMaterialsSection from "@/components/materials/JobMaterialsSection";
 import PageHeader from "@/components/PageHeader";
 import IssueList from "@/components/issues/IssueList";
 import JobPhotos from "@/components/photos/JobPhotos";
@@ -31,7 +31,6 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeS
 
 
 
-const BEFORE_PRODUCTION = ["DRAFT", "AWAITING_MATERIAL", "QUEUED_FOR_CUTTING"];
 
 export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNumber]">) {
   const viewer = await requireRole("SUPER_ADMIN", "ADMIN");
@@ -93,36 +92,19 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
         <Detail label="Created">{dateFormat.format(job.createdAt)}</Detail>
         <Detail label="Last updated">{dateFormat.format(job.updatedAt)}</Detail>
         <Detail label="Materials">
-          {job.materialConfirmedAt
-            ? `Available · confirmed ${dateFormat.format(job.materialConfirmedAt)}${job.materialConfirmedBy ? ` by ${actorName.get(job.materialConfirmedBy.toString()) ?? "staff"}` : ""}`
-            : "Not yet confirmed"}
+          <span className={job.materialConfirmedAt ? "font-medium text-emerald-800" : "font-medium text-amber-800"}>
+            {job.materialConfirmedAt ? "In the workshop" : "Waiting for materials"}
+          </span>
         </Detail>
         {job.status === "QUEUED_FOR_CUTTING" && job.cuttingQueueSeq != null && (
           <Detail label="Cutting queue">Ticket #{job.cuttingQueueSeq}</Detail>
         )}
       </dl>
 
-      {BEFORE_PRODUCTION.includes(job.status) && (
-        <section className="mb-8 flex flex-wrap items-center gap-3 rounded-lg bg-card p-5">
-          <div className="mr-auto">
-            <h2 className="font-semibold">Materials</h2>
-            <p className="text-sm text-muted-foreground">
-              {job.materialConfirmedAt
-                ? job.status === "QUEUED_FOR_CUTTING"
-                  ? "The boards are in the workshop and the job is waiting in the cutting queue."
-                  : "The boards are in the workshop. The job joins the cutting queue when its cutlist is approved."
-                : job.status === "AWAITING_MATERIAL"
-                  ? "The cutlist is approved. Confirm the boards are in the workshop to send the job to the cutting queue."
-                  : "Confirm when the boards for this job are in the workshop."}
-            </p>
-          </div>
-          {job.materialConfirmedAt ? (
-            <MaterialsNotAvailableButton workNumber={job.workNumber} queued={job.status === "QUEUED_FOR_CUTTING"} />
-          ) : (
-            <MaterialsAvailableButton workNumber={job.workNumber} approved={job.status === "AWAITING_MATERIAL"} />
-          )}
-        </section>
-      )}
+      <JobMaterialsSection
+        job={job}
+        confirmedByName={job.materialConfirmedBy ? actorName.get(job.materialConfirmedBy.toString()) : undefined}
+      />
 
       {issues.rows.length > 0 && (
         <section aria-labelledby="issues" className="mb-8 space-y-3">
