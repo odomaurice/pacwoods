@@ -21,8 +21,9 @@ function assertStaff(actor: Actor) {
 
 /** Hash of everything that affects the layout (not display-only options). */
 export function inputHash(input: CutlistInput) {
-  const { labelsOnPanels: _display, ...options } = input.options;
+  const { labelsOnPanels: _display, unit: _unit, ...options } = input.options;
   void _display;
+  void _unit;
   const canonical = JSON.stringify({
     parts: input.parts.map(({ ref, length, width, quantity, materialId, grain, edges }) => [ref, length, width, quantity, materialId ?? "", grain, edges.length1, edges.length2, edges.width1, edges.width2]),
     stock: input.stockSheets.map(({ ref, length, width, quantity, materialId, grained }) => [ref, length, width, quantity, materialId ?? "", grained]),

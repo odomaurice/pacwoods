@@ -5,9 +5,20 @@ import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon, Delete02Icon, Layers01Icon, PlayIcon, Settings02Icon, SquareIcon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
-import { generatePlanAction, saveCutlistAction } from "@/actions/cutlists";
+import Link from "next/link";
+import { generatePlanAction, saveCutlistAction, type PlanSummary } from "@/actions/cutlists";
 import EdgePicker from "@/components/cutlist/EdgePicker";
+import PlanPreview, { type PreviewData } from "@/components/cutlist/PlanPreview";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   GRAIN_LABELS,
@@ -20,6 +31,7 @@ import {
   type CutlistOptions,
 } from "@/lib/cutlist";
 import type { Edges, PartGrain } from "@/lib/cutting/types";
+import { LENGTH_UNITS, UNIT_LABELS, convertText, fromMm, toMm, type LengthUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
 export type MaterialOption = {
@@ -92,24 +104,24 @@ function withTrailingBlank<T extends { ref: string; label: string; length: strin
 
 const num = (s: string) => (s.trim() === "" ? Number.NaN : Number(s));
 
-function toPart(r: PartRow) {
+function toPart(r: PartRow, unit: LengthUnit) {
   return {
     ref: r.ref,
     label: r.label.trim() || undefined,
-    length: num(r.length),
-    width: num(r.width),
+    length: toMm(num(r.length), unit),
+    width: toMm(num(r.width), unit),
     quantity: num(r.quantity),
     materialId: r.materialId || undefined,
     grain: r.grain,
     edges: r.edges,
   };
 }
-function toStock(r: StockRow) {
+function toStock(r: StockRow, unit: LengthUnit) {
   return {
     ref: r.ref,
     label: r.label.trim() || undefined,
-    length: num(r.length),
-    width: num(r.width),
+    length: toMm(num(r.length), unit),
+    width: toMm(num(r.width), unit),
     quantity: num(r.quantity),
     materialId: r.materialId || undefined,
     grained: r.grained,
@@ -123,24 +135,30 @@ export default function CutlistEditor({
   initial,
   materials,
   readOnly,
+  preview,
 }: {
   workNumber: string;
   initial: CutlistInput;
   materials: MaterialOption[];
   readOnly: boolean;
+  /** The last generated plan, shown beside the cutlist. */
+  preview: PreviewData | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [dirty, setDirty] = useState(false);
-  const [formError, setFormError] = useState<string>();
+  /** Errors and optimiser results open in a popup. */
+  const [notice, setNotice] = useState<{ title: string; body: ReactNode; showPlan?: boolean } | null>(null);
+  const setFormError = (message: string | undefined) => setNotice(message ? { title: "Check the cutlist", body: message } : null);
+  const unit: LengthUnit = initial.options.unit ?? "mm";
 
   const [parts, setPartsRaw] = useState<PartRow[]>(() =>
     withTrailingBlank(
       initial.parts.map((p) => ({
         ref: p.ref,
         label: p.label ?? "",
-        length: String(p.length),
-        width: String(p.width),
+        length: fromMm(p.length, unit),
+        width: fromMm(p.width, unit),
         quantity: String(p.quantity),
         materialId: p.materialId ?? "",
         grain: p.grain,
@@ -155,8 +173,8 @@ export default function CutlistEditor({
       initial.stockSheets.map((s) => ({
         ref: s.ref,
         label: s.label ?? "",
-        length: String(s.length),
-        width: String(s.width),
+        length: fromMm(s.length, unit),
+        width: fromMm(s.width, unit),
         quantity: String(s.quantity),
         materialId: s.materialId ?? "",
         grained: s.grained,
@@ -165,7 +183,17 @@ export default function CutlistEditor({
       blankStock,
     ),
   );
-  const [options, setOptionsRaw] = useState<CutlistOptions>(initial.options);
+  const [options, setOptionsRaw] = useState<CutlistOptions>({ ...initial.options, unit });
+  const current: LengthUnit = options.unit ?? "mm";
+
+  /** Switching units re-expresses every size already typed. */
+  function changeUnit(next: LengthUnit) {
+    const conv = <T extends { length: string; width: string }>(r: T) => ({ ...r, length: convertText(r.length, current, next), width: convertText(r.width, current, next) });
+    setPartsRaw((rows) => rows.map(conv));
+    setStocksRaw((rows) => rows.map(conv));
+    setOptionsRaw((o) => ({ ...o, unit: next }));
+    setDirty(true);
+  }
 
   const setParts = (rows: PartRow[]) => {
     setPartsRaw(withTrailingBlank(rows, "P", blankPart));
@@ -182,12 +210,12 @@ export default function CutlistEditor({
 
   // Per-row problems, shown under the row; blank rows are simply ignored.
   const partErrors = useMemo(
-    () => new Map(parts.filter((r) => !isBlank(r)).map((r) => [r.ref, cutlistPartSchema.safeParse(toPart(r)).error?.issues[0]?.message])),
-    [parts],
+    () => new Map(parts.filter((r) => !isBlank(r)).map((r) => [r.ref, cutlistPartSchema.safeParse(toPart(r, current)).error?.issues[0]?.message])),
+    [parts, current],
   );
   const stockErrors = useMemo(
-    () => new Map(stocks.filter((r) => !isBlank(r)).map((r) => [r.ref, cutlistStockSchema.safeParse(toStock(r)).error?.issues[0]?.message])),
-    [stocks],
+    () => new Map(stocks.filter((r) => !isBlank(r)).map((r) => [r.ref, cutlistStockSchema.safeParse(toStock(r, current)).error?.issues[0]?.message])),
+    [stocks, current],
   );
 
   const materialById = useMemo(() => new Map(materials.map((m) => [m.id, m])), [materials]);
@@ -202,8 +230,8 @@ export default function CutlistEditor({
   function collect(): CutlistInput | null {
     setFormError(undefined);
     const input = {
-      parts: filledParts.map(toPart),
-      stockSheets: stocks.filter((r) => !isBlank(r)).map(toStock),
+      parts: filledParts.map((r) => toPart(r, current)),
+      stockSheets: stocks.filter((r) => !isBlank(r)).map((r) => toStock(r, current)),
       options,
     };
     const parsed = cutlistSchema.safeParse(input);
@@ -233,7 +261,8 @@ export default function CutlistEditor({
       const result = await generatePlanAction(workNumber, input);
       if (result.ok) {
         setDirty(false);
-        router.push(`/admin/jobs/${workNumber}/plan`);
+        router.refresh();
+        setNotice(resultNotice(result.summary));
       } else setFormError(result.error);
     });
   }
@@ -254,7 +283,8 @@ export default function CutlistEditor({
   );
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="grid gap-6 pb-24 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="min-w-0 space-y-4">
       {readOnly && (
         <Alert>
           <AlertDescription>This cutlist is approved and locked. Reopen it from the job page to change it.</AlertDescription>
@@ -267,72 +297,55 @@ export default function CutlistEditor({
           </AlertDescription>
         </Alert>
       )}
-      {formError && (
-        <Alert variant="destructive">
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      )}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-card px-4 py-3">
+        <label htmlFor="unit" className="text-sm font-medium">
+          Sizes in
+        </label>
+        <select id="unit" className={cn(cell, "w-auto")} value={current} disabled={readOnly} onChange={(e) => changeUnit(e.target.value as LengthUnit)}>
+          {LENGTH_UNITS.map((u) => (
+            <option key={u} value={u}>
+              {UNIT_LABELS[u]}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted-foreground">Changing it converts what is already typed. Plans and the workshop always use millimetres.</span>
+      </div>
 
       <Section icon={SquareIcon} title="Panels" summary={`${filledParts.length} rows · ${totalPanels} panels`}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] border-separate border-spacing-y-1 text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="w-24 px-1 font-medium">Length</th>
-                <th className="w-24 px-1 font-medium">Width</th>
-                <th className="w-20 px-1 font-medium">Qty</th>
-                <th className="px-1 font-medium">Label</th>
-                <th className="px-1 font-medium">Material</th>
-                <th className="px-1 font-medium">Grain</th>
-                <th className="px-1 font-medium">Edges</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {parts.map((row, i) => {
-                const error = partErrors.get(row.ref);
-                const blank = isBlank(row);
-                const update = (patch: Partial<PartRow>) => setParts(parts.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-                return (
-                  <PartRowView key={row.ref} error={error}>
-                    <td className="px-1">
-                      <input aria-label="Length (mm)" inputMode="decimal" className={cell} value={row.length} disabled={readOnly} onChange={(e) => update({ length: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Width (mm)" inputMode="decimal" className={cell} value={row.width} disabled={readOnly} onChange={(e) => update({ width: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Quantity" inputMode="numeric" className={cell} value={row.quantity} disabled={readOnly} onChange={(e) => update({ quantity: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Label" className={cn(cell, "min-w-28")} value={row.label} placeholder={blank ? "New panel…" : row.ref} disabled={readOnly} onChange={(e) => update({ label: e.target.value })} />
-                    </td>
-                    <td className="px-1">{materialSelect(row.materialId, (materialId) => update({ materialId }), "Material")}</td>
-                    <td className="px-1">
-                      <select aria-label="Grain" className={cn(cell, "min-w-32")} value={row.grain} disabled={readOnly} onChange={(e) => update({ grain: e.target.value as PartGrain })}>
-                        {PART_GRAINS.map((g) => (
-                          <option key={g} value={g}>
-                            {GRAIN_LABELS[g]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-1">
-                      <EdgePicker value={row.edges} disabled={readOnly} onChange={(edges) => update({ edges })} />
-                    </td>
-                    <td className="px-1">
-                      {!blank && !readOnly && (
-                        <RemoveButton label={`Remove ${row.label || row.ref}`} onClick={() => setParts(parts.filter((_, j) => j !== i))} />
-                      )}
-                    </td>
-                  </PartRowView>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <RowHeader labels={[`Length (${current})`, `Width (${current})`, "Qty", "Label"]} />
+        <ol className="space-y-1.5">
+          {parts.map((row, i) => {
+            const error = partErrors.get(row.ref);
+            const blank = isBlank(row);
+            const update = (patch: Partial<PartRow>) => setParts(parts.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+            return (
+              <EntryRow key={row.ref} error={error}>
+                <div className={FIRST_LINE}>
+                  <input aria-label={`Length (${current})`} inputMode="decimal" className={cell} value={row.length} disabled={readOnly} onChange={(e) => update({ length: e.target.value })} />
+                  <input aria-label={`Width (${current})`} inputMode="decimal" className={cell} value={row.width} disabled={readOnly} onChange={(e) => update({ width: e.target.value })} />
+                  <input aria-label="Quantity" inputMode="numeric" className={cell} value={row.quantity} disabled={readOnly} onChange={(e) => update({ quantity: e.target.value })} />
+                  <input aria-label="Label" className={cell} value={row.label} placeholder={blank ? "New panel…" : row.ref} disabled={readOnly} onChange={(e) => update({ label: e.target.value })} />
+                </div>
+                {!blank && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-40 flex-1">{materialSelect(row.materialId, (materialId) => update({ materialId }), "Material")}</span>
+                    <select aria-label="Grain" title="Grain direction" className={cn(cell, "w-auto")} value={row.grain} disabled={readOnly} onChange={(e) => update({ grain: e.target.value as PartGrain })}>
+                      {PART_GRAINS.map((g) => (
+                        <option key={g} value={g}>
+                          Grain: {GRAIN_LABELS[g].toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                    <EdgePicker value={row.edges} disabled={readOnly} onChange={(edges) => update({ edges })} />
+                    {!readOnly && <RemoveButton label={`Remove ${row.label || row.ref}`} onClick={() => setParts(parts.filter((_, j) => j !== i))} />}
+                  </div>
+                )}
+              </EntryRow>
+            );
+          })}
+        </ol>
         <p className="mt-2 text-xs text-muted-foreground">
-          Sizes in millimetres. Tap the sides of the small rectangle to mark edge banding; the long sides are top and bottom.
+          Sizes in {UNIT_LABELS[current].toLowerCase()}. Tap the sides of the small rectangle to mark edge banding (the long sides are top and bottom), or press All round.
         </p>
       </Section>
 
@@ -355,8 +368,8 @@ export default function CutlistEditor({
                   {
                     ref: nextRef("S", stocks),
                     label: "",
-                    length: String(m.sheetLengthMm),
-                    width: String(m.sheetWidthMm),
+                    length: fromMm(m.sheetLengthMm, current),
+                    width: fromMm(m.sheetWidthMm, current),
                     quantity: "1",
                     materialId: m.id,
                     grained: m.grained,
@@ -377,58 +390,39 @@ export default function CutlistEditor({
             </select>
           </div>
         )}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[44rem] border-separate border-spacing-y-1 text-sm">
-            <thead className="text-left text-muted-foreground">
-              <tr>
-                <th className="w-24 px-1 font-medium">Length</th>
-                <th className="w-24 px-1 font-medium">Width</th>
-                <th className="w-20 px-1 font-medium">Qty</th>
-                <th className="px-1 font-medium">Label</th>
-                <th className="px-1 font-medium">Material</th>
-                <th className="px-1 font-medium">Grain along length</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {stocks.map((row, i) => {
-                const error = stockErrors.get(row.ref);
-                const blank = isBlank(row);
-                const update = (patch: Partial<StockRow>) => setStocks(stocks.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-                return (
-                  <PartRowView key={row.ref} error={error}>
-                    <td className="px-1">
-                      <input aria-label="Sheet length (mm)" inputMode="decimal" className={cell} value={row.length} disabled={readOnly} onChange={(e) => update({ length: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Sheet width (mm)" inputMode="decimal" className={cell} value={row.width} disabled={readOnly} onChange={(e) => update({ width: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Sheets available" inputMode="numeric" className={cell} value={row.quantity} disabled={readOnly} onChange={(e) => update({ quantity: e.target.value })} />
-                    </td>
-                    <td className="px-1">
-                      <input aria-label="Sheet label" className={cn(cell, "min-w-28")} value={row.label} placeholder={blank ? "New sheet…" : row.ref} disabled={readOnly} onChange={(e) => update({ label: e.target.value })} />
-                    </td>
-                    <td className="px-1">
+        <RowHeader labels={[`Length (${current})`, `Width (${current})`, "Sheets", "Label"]} />
+        <ol className="space-y-1.5">
+          {stocks.map((row, i) => {
+            const error = stockErrors.get(row.ref);
+            const blank = isBlank(row);
+            const update = (patch: Partial<StockRow>) => setStocks(stocks.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+            return (
+              <EntryRow key={row.ref} error={error}>
+                <div className={FIRST_LINE}>
+                  <input aria-label={`Sheet length (${current})`} inputMode="decimal" className={cell} value={row.length} disabled={readOnly} onChange={(e) => update({ length: e.target.value })} />
+                  <input aria-label={`Sheet width (${current})`} inputMode="decimal" className={cell} value={row.width} disabled={readOnly} onChange={(e) => update({ width: e.target.value })} />
+                  <input aria-label="Sheets available" inputMode="numeric" className={cell} value={row.quantity} disabled={readOnly} onChange={(e) => update({ quantity: e.target.value })} />
+                  <input aria-label="Sheet label" className={cell} value={row.label} placeholder={blank ? "New sheet…" : row.ref} disabled={readOnly} onChange={(e) => update({ label: e.target.value })} />
+                </div>
+                {!blank && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-40 flex-1">
                       {materialSelect(row.materialId, (materialId) => {
                         const m = materialById.get(materialId);
                         update({ materialId, grained: m ? m.grained : row.grained });
                       }, "Sheet material")}
-                    </td>
-                    <td className="px-1">
-                      <input type="checkbox" aria-label="Grain along the sheet length" className="size-5 accent-brand-charcoal" checked={row.grained} disabled={readOnly} onChange={(e) => update({ grained: e.target.checked })} />
-                    </td>
-                    <td className="px-1">
-                      {!blank && !readOnly && (
-                        <RemoveButton label={`Remove ${row.label || row.ref}`} onClick={() => setStocks(stocks.filter((_, j) => j !== i))} />
-                      )}
-                    </td>
-                  </PartRowView>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                    <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md bg-card px-3 text-sm">
+                      <input type="checkbox" className="size-5 accent-brand-charcoal" checked={row.grained} disabled={readOnly} onChange={(e) => update({ grained: e.target.checked })} />
+                      Grain along length
+                    </label>
+                    {!readOnly && <RemoveButton label={`Remove ${row.label || row.ref}`} onClick={() => setStocks(stocks.filter((_, j) => j !== i))} />}
+                  </div>
+                )}
+              </EntryRow>
+            );
+          })}
+        </ol>
       </Section>
 
       <Section icon={Settings02Icon} title="Options">
@@ -485,7 +479,55 @@ export default function CutlistEditor({
         </>
       )}
     </div>
+      <aside aria-label="Cutting plan preview" className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto [scrollbar-width:thin]">
+        <PlanPreview workNumber={workNumber} data={preview} stale={dirty} />
+      </aside>
+
+      <AlertDialog open={notice !== null} onOpenChange={(open) => !open && setNotice(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{notice?.title}</AlertDialogTitle>
+            <AlertDialogDescription render={<div />}>{notice?.body}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {notice?.showPlan && (
+              <Link href={`/admin/jobs/${workNumber}/plan`} className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium underline-offset-4 hover:underline">
+                Open full plan
+              </Link>
+            )}
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
+}
+
+function resultNotice(s: PlanSummary): { title: string; body: ReactNode; showPlan: boolean } {
+  const usage = `${s.sheets} sheet${s.sheets === 1 ? "" : "s"}, ${(s.utilization * 100).toFixed(0)}% of the board used.`;
+  if (s.unplaced.length === 0) return { title: "Cutting plan ready", body: `All ${s.requested} panels placed on ${usage}`, showPlan: true };
+  return {
+    title: `${s.requested - s.placed} panel${s.requested - s.placed === 1 ? "" : "s"} could not be placed`,
+    body: (
+      <span className="block space-y-2">
+        <span className="block">
+          {s.placed} of {s.requested} panels placed on {usage}
+        </span>
+        <span className="block space-y-1">
+          {s.unplaced.map((u) => (
+            <span key={`${u.label}|${u.reason}`} className="block">
+              <span className="font-medium text-foreground">
+                {u.label} ×{u.copies}
+              </span>
+              : {u.reason}
+            </span>
+          ))}
+        </span>
+        <span className="block">Fix these before the cutlist can be approved.</span>
+      </span>
+    ),
+    showPlan: true,
+  };
 }
 
 function Section({ icon, title, summary, children }: { icon: typeof SquareIcon; title: string; summary?: string; children: ReactNode }) {
@@ -502,18 +544,25 @@ function Section({ icon, title, summary, children }: { icon: typeof SquareIcon; 
   );
 }
 
-function PartRowView({ error, children }: { error?: string; children: ReactNode }) {
+/** Length, width, quantity and label share one grid so the columns line up under the header. */
+const FIRST_LINE = "grid grid-cols-[repeat(3,minmax(0,5.5rem))_minmax(0,1fr)] gap-1.5";
+
+function RowHeader({ labels }: { labels: string[] }) {
   return (
-    <>
-      <tr className={cn(error && "[&>td]:bg-destructive/5")}>{children}</tr>
-      {error && (
-        <tr>
-          <td colSpan={8} className="px-2 pb-1 text-xs text-destructive">
-            {error}
-          </td>
-        </tr>
-      )}
-    </>
+    <div className={cn(FIRST_LINE, "mb-1 px-2 text-xs font-medium text-muted-foreground")} aria-hidden>
+      {labels.map((l) => (
+        <span key={l}>{l}</span>
+      ))}
+    </div>
+  );
+}
+
+function EntryRow({ error, children }: { error?: string; children: ReactNode }) {
+  return (
+    <li className={cn("space-y-1.5 rounded-md p-2 odd:bg-muted/50", error && "bg-destructive/5 odd:bg-destructive/5")}>
+      {children}
+      {error && <p className="px-1 text-xs text-destructive">{error}</p>}
+    </li>
   );
 }
 

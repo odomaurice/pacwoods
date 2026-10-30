@@ -3,6 +3,7 @@
  * cutting engine. Shared by the editor (browser) and the server.
  */
 import { z } from "zod";
+import { LENGTH_UNITS } from "@/lib/units";
 import { bandedSides } from "@/lib/cutting/engine";
 import type { CutOptions, Edges, PartInput, PlanTotals, StockInput } from "@/lib/cutting/types";
 
@@ -55,6 +56,8 @@ export const cutlistOptionsSchema = z.object({
   considerGrain: z.boolean(),
   deductEdgeBanding: z.boolean(),
   edgeBandThickness: z.number().min(0).max(5),
+  /** The unit sizes are typed in; stored sizes are always millimetres. */
+  unit: z.enum(LENGTH_UNITS).optional(),
 });
 
 export const cutlistSchema = z
@@ -99,6 +102,7 @@ export const DEFAULT_OPTIONS: CutlistOptions = {
   considerGrain: false,
   deductEdgeBanding: false,
   edgeBandThickness: 1,
+  unit: "mm",
 };
 
 export const NO_EDGES: Edges = { length1: false, length2: false, width1: false, width2: false };
