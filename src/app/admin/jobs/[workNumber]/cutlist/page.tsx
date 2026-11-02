@@ -38,7 +38,7 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
         stockSheets: current.stockSheets.map(pickStock),
         options: current.options,
       }
-    : await emptyCutlist();
+    : await startingCutlist(job.materials ?? [], materials);
 
   const preview: PreviewData | null = current?.plan
     ? {
@@ -62,8 +62,34 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
           current ? `Version ${current.version}${current.state === "APPROVED" ? " · approved" : " · draft"}` : "Enter panels and stock sheets, then press ▶ to generate the cutting plan."
         }
       />
-      {job.status === "DRAFT" && <JobSteps current={4} workNumber={workNumber} />}
+      {job.status === "DRAFT" && <JobSteps current={3} />}
       <CutlistEditor workNumber={workNumber} initial={initial} materials={materials} readOnly={job.status !== "DRAFT"} preview={preview} cnc={Boolean(job.operations?.cnc)} />
     </>
   );
+}
+
+/**
+ * A new cutlist starts from the boards recorded for the job (in the first
+ * step of creating it), so they are not typed twice; lines without a sheet
+ * size are left out.
+ */
+async function startingCutlist(
+  recorded: Array<{ materialId?: unknown; sheetLengthMm?: number | null; sheetWidthMm?: number | null; sheets: number }>,
+  catalogue: MaterialOption[],
+): Promise<CutlistInput> {
+  const empty = await emptyCutlist();
+  const stockSheets = recorded
+    .filter((m) => m.sheetLengthMm && m.sheetWidthMm)
+    .map((m, i) => {
+      const id = m.materialId ? String(m.materialId) : undefined;
+      return {
+        ref: `S${i + 1}`,
+        length: m.sheetLengthMm!,
+        width: m.sheetWidthMm!,
+        quantity: m.sheets,
+        materialId: id,
+        grained: catalogue.find((c) => c.id === id)?.grained ?? false,
+      };
+    });
+  return { ...empty, stockSheets };
 }

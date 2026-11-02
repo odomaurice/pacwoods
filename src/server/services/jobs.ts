@@ -50,6 +50,7 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
           qrToken: randomBytes(16).toString("base64url"),
           createdBy: actor.id,
           ...(data.materialsAvailable ? { materialConfirmedAt: new Date(), materialConfirmedBy: actor.id } : {}),
+          materials: (data.materials ?? []).map((m) => ({ ...m, materialId: m.materialId && mongoose.isValidObjectId(m.materialId) ? m.materialId : undefined, note: m.note || undefined })),
         },
       ],
       { session },
@@ -68,6 +69,10 @@ export async function createJob(actor: Actor, input: JobInput, now = new Date())
     );
     if (data.materialsAvailable) {
       await recordJobEvent(created._id, { type: "MATERIAL_CONFIRMED", actorId: actor.id, note: "Materials available" }, session);
+    }
+    if (data.materials?.length) {
+      const list = data.materials.map((m) => `${describeMaterial(m)} × ${m.sheets}`).join(", ");
+      await recordJobEvent(created._id, { type: "MATERIAL_DETAILS", actorId: actor.id, note: `Materials recorded: ${list}`, clientVisible: false }, session);
     }
     if (data.payment && data.payment.status !== "UNPAID") {
       await addClientPayment(actor, created, { ...data.payment, coverage: data.payment.status }, session);

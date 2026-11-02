@@ -13,7 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clientAccountSchema, type ClientAccountInput } from "@/lib/schemas";
 
-export default function ClientForm({ wizard = false }: { /** Inside the new-job flow: continue to the job, not back to the client list. */ wizard?: boolean } = {}) {
+export default function ClientForm({
+  onCreated,
+}: {
+  /** Inside the new-job flow: carry on with this client instead of going back to the client list. */
+  onCreated?: (client: { id: string; label: string }) => void;
+} = {}) {
+  const wizard = Boolean(onCreated);
   const [created, setCreated] = useState<Extract<CreatedAccount, { ok: true }>>();
   const [serverError, setServerError] = useState<string>();
   const [pending, startTransition] = useTransition();
@@ -46,10 +52,10 @@ export default function ClientForm({ wizard = false }: { /** Inside the new-job 
           password={created.temporaryPassword}
           extra={created.clientNumber}
         />
-        {wizard && created.clientId && (
-          <Link href={`/admin/jobs/new?client=${created.clientId}`} className={buttonVariants({ variant: "gold", className: "h-11 w-full" })}>
-            Continue: job details →
-          </Link>
+        {onCreated && created.clientId && (
+          <Button variant="gold" className="h-11 w-full" onClick={() => onCreated({ id: created.clientId!, label: `${created.name} (${created.clientNumber})` })}>
+            Continue: materials →
+          </Button>
         )}
         <div className={wizard ? "hidden" : "flex flex-wrap gap-2"}>
           {created.clientId && (

@@ -34,6 +34,22 @@ describe.skipIf(!hasDatabase)("job materials (MongoDB)", () => {
     expect(await planMaterials(noPlan._id)).toEqual([]);
   });
 
+  it("saves the boards entered with the client when the job is created", async () => {
+    const job = await createJob(root, {
+      clientId,
+      cutting: true,
+      edging: false,
+      materialsAvailable: true,
+      materials: [{ name: "White melamine", thicknessMm: 18, sheetLengthMm: 2440, sheetWidthMm: 1220, sheets: 2, suppliedBy: "CLIENT" }],
+    });
+    const saved = (await Job.findById(job._id).lean())!;
+    expect(saved.materials).toEqual([expect.objectContaining({ name: "White melamine", sheets: 2, suppliedBy: "CLIENT" })]);
+    expect(saved.materialConfirmedAt).toBeTruthy();
+    const event = await JobStatusEvent.findOne({ jobId: job._id, type: "MATERIAL_DETAILS" }).lean();
+    expect(event?.note).toBe("Materials recorded: White melamine 18 mm × 2");
+    await expect(createJob(root, { clientId, cutting: true, edging: false, materials: [{ name: "X", sheets: 0 }] })).rejects.toBeTruthy();
+  });
+
   it("records the boards staff enter, on the timeline, and validates them", async () => {
     const job = await createJob(root, { clientId, cutting: true, edging: false });
     await saveJobMaterials(root, job.workNumber, [

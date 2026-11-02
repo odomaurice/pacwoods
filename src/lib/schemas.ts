@@ -3,6 +3,7 @@
  * server (actions and services). The server always re-validates.
  */
 import { z } from "zod";
+import { jobMaterialsSchema } from "@/lib/job-materials";
 import { jobPaymentSchema } from "@/lib/payments";
 import { CAPABILITIES, PERMISSIONS } from "@/lib/roles";
 
@@ -93,6 +94,8 @@ export const jobSchema = jobDetailsSchema.and(
     materialsAvailable: z.boolean().optional(),
     /** Whether the client has paid yet (payments happen outside Pacwoods). */
     payment: jobPaymentSchema.optional(),
+    /** The boards, entered with the client in the first step of a new job. */
+    materials: jobMaterialsSchema.optional(),
   }),
 );
 export type JobInput = z.infer<typeof jobSchema>;

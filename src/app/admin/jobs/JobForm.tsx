@@ -15,6 +15,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/lib/payments";
+import type { JobMaterialInput } from "@/lib/job-materials";
 import { jobSchema, type JobInput } from "@/lib/schemas";
 
 type ClientOption = { id: string; label: string };
@@ -27,12 +28,15 @@ export default function JobForm({
   clients,
   defaultClientId,
   chosenClient,
+  flow,
   existing,
 }: {
   clients?: ClientOption[];
   defaultClientId?: string;
   /** Picked in the client step: shown, with a link back to change it. */
   chosenClient?: string;
+  /** The new-job flow: the boards and their arrival come from step 1. */
+  flow?: { materials: JobMaterialInput[]; materialsAvailable: boolean; onBack: () => void };
   /** Editing a draft: the client cannot change, so it rides along unseen. */
   existing?: { workNumber: string; values: JobInput };
 }) {
@@ -66,7 +70,7 @@ export default function JobForm({
         if (result && !result.ok) setServerError(result.error);
         return;
       }
-      const result = await createJobAction({ ...details, clientId });
+      const result = await createJobAction(flow ? { ...details, clientId, materials: flow.materials, materialsAvailable: flow.materialsAvailable } : { ...details, clientId });
       if (!result.ok) {
         setServerError(result.error);
         return;
@@ -82,7 +86,7 @@ export default function JobForm({
         mark(i, error ? { error: true } : { done: true });
       }
       setProgress(undefined);
-      router.push(`/admin/jobs/${result.workNumber}/materials`);
+      router.push(flow ? `/admin/jobs/${result.workNumber}/cutlist` : `/admin/jobs/${result.workNumber}`);
     });
   });
 
@@ -100,9 +104,15 @@ export default function JobForm({
             <span className="block text-muted-foreground">Client</span>
             <span className="font-medium">{chosenClient}</span>
           </span>
-          <Link href="/admin/jobs/new" className="ml-auto text-sm font-medium underline-offset-4 hover:underline">
-            Change
-          </Link>
+          {flow ? (
+            <button type="button" onClick={flow.onBack} className="ml-auto cursor-pointer text-sm font-medium underline-offset-4 hover:underline">
+              Change
+            </button>
+          ) : (
+            <Link href="/admin/jobs/new" className="ml-auto text-sm font-medium underline-offset-4 hover:underline">
+              Change
+            </Link>
+          )}
         </div>
       )}
       {clients && !chosenClient && (
@@ -227,7 +237,7 @@ export default function JobForm({
         </fieldset>
       )}
 
-      {!editing && (
+      {!editing && !flow && (
         <label className="flex min-h-11 items-start gap-3 rounded-lg bg-accent p-3 text-sm">
           <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("materialsAvailable")} />
           <span>
@@ -249,12 +259,17 @@ export default function JobForm({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Parts, stock sheets and the cutting plan are added on the job after it is created.
+        {flow ? "Next: the cutlist (panels, stock sheets and the cutting plan)." : "Parts, stock sheets and the cutting plan are added on the job after it is created."}
       </p>
 
       <div className="flex gap-2">
+        {flow && (
+          <Button type="button" variant="outline" className="h-11" disabled={pending} onClick={flow.onBack}>
+            ← Back
+          </Button>
+        )}
         <Button type="submit" disabled={pending} className="h-11">
-          {progress ?? (pending ? "Saving…" : editing ? "Save changes" : "Create job")}
+          {progress ?? (pending ? "Saving…" : editing ? "Save changes" : flow ? "Create job, then cutlist →" : "Create job")}
         </Button>
         <Link
           href={existing ? `/admin/jobs/${existing.workNumber}` : "/admin/jobs"}
