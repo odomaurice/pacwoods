@@ -29,7 +29,7 @@ export default async function OperatorTaskPage({ params }: { params: Promise<{ i
 
   return (
     <>
-      <Link href="/operator/queue" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/operator/queue" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← My queue
       </Link>
       <PageHeader

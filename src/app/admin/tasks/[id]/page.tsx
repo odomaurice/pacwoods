@@ -25,7 +25,7 @@ export default async function StaffTaskPage({ params }: PageProps<"/admin/tasks/
 
   return (
     <>
-      <Link href="/admin/queues" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/admin/queues" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← Queues
       </Link>
       <PageHeader

@@ -24,7 +24,7 @@ export default async function IssuePage({ params }: PageProps<"/admin/issues/[id
 
   return (
     <>
-      <Link href="/admin/issues" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/admin/issues" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← Issues
       </Link>
       <PageHeader

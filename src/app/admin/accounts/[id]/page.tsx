@@ -38,7 +38,7 @@ export default async function AccountPage({ params }: PageProps<"/admin/accounts
 
   return (
     <>
-      <Link href={back.href} className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href={back.href} className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← {back.label}
       </Link>
       <PageHeader

@@ -54,7 +54,7 @@ export default async function JobPage({ params }: PageProps<"/admin/jobs/[workNu
 
   return (
     <>
-      <Link href="/admin/jobs" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/admin/jobs" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← Jobs
       </Link>
       <PageHeader

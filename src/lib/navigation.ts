@@ -99,3 +99,35 @@ function baseNavigation(user: { role: Role; permissions: readonly Permission[] }
       ];
   }
 }
+
+/**
+ * The phone tab bar: each role's four most-used places. Everything else is
+ * under "More", which opens the full menu.
+ */
+export function tabsFor(user: { role: Role }, counts: { unread?: number } = {}): NavItem[] {
+  const alerts: NavItem = { href: "/notifications", label: "Alerts", icon: Notification01Icon, badge: counts.unread || undefined };
+  switch (user.role) {
+    case "SUPER_ADMIN":
+    case "ADMIN":
+      return [
+        { href: "/admin", label: "Home", icon: DashboardSquare01Icon },
+        { href: "/admin/jobs", label: "Jobs", icon: Briefcase01Icon },
+        { href: "/admin/queues", label: "Queues", icon: ListViewIcon },
+        alerts,
+      ];
+    case "OPERATOR":
+      return [
+        { href: "/operator", label: "Home", icon: DashboardSquare01Icon },
+        { href: "/operator/queue", label: "My queue", icon: Task01Icon },
+        { href: "/operator/history", label: "History", icon: WorkHistoryIcon },
+        alerts,
+      ];
+    case "CLIENT":
+      return [
+        { href: "/client", label: "Home", icon: DashboardSquare01Icon },
+        { href: "/client/jobs", label: "My jobs", icon: Briefcase01Icon },
+        { href: "/client/card", label: "My card", icon: IdentityCardIcon },
+        alerts,
+      ];
+  }
+}

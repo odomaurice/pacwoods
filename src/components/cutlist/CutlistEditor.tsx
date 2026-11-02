@@ -490,7 +490,7 @@ export default function CutlistEditor({
             disabled={pending}
             aria-label="Generate cutting plan"
             title="Generate cutting plan"
-            className="fixed right-6 bottom-6 z-20 inline-flex size-16 items-center justify-center rounded-full bg-brand-charcoal text-white shadow-lg hover:bg-brand-charcoal/90 disabled:opacity-60 print:hidden"
+            className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-20 sm:right-6 lg:bottom-6 inline-flex size-16 items-center justify-center rounded-full bg-brand-charcoal text-white shadow-lg hover:bg-brand-charcoal/90 disabled:opacity-60 print:hidden"
           >
             <HugeiconsIcon icon={PlayIcon} className={cn("size-7", pending && "animate-pulse")} />
           </button>

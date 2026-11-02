@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -20,6 +20,16 @@ export const metadata: Metadata = {
   title: "Pacwoods | Industrial Wood Processing Centre",
   description:
     "Pacwoods: panel cutting, CNC machining and edge-banding services.",
+  applicationName: "Pacwoods",
+  // Installed on an iPhone: full screen, the content runs under the status bar.
+  appleWebApp: { capable: true, title: "Pacwoods", statusBarStyle: "black-translucent" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1b2328",
+  // Lets the app reach the screen edges on notched phones; the shell pads
+  // itself with the safe-area insets.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

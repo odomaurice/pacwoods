@@ -27,7 +27,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clients/[
 
   return (
     <>
-      <Link href="/admin/clients" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/admin/clients" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← Clients
       </Link>
       <PageHeader

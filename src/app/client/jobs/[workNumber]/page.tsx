@@ -33,7 +33,7 @@ export default async function ClientJobPage({ params }: PageProps<"/client/jobs/
 
   return (
     <>
-      <Link href="/client/jobs" className="mb-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/client/jobs" className="mb-3 hidden text-sm text-muted-foreground hover:text-foreground lg:inline-block">
         ← My jobs
       </Link>
       <PageHeader

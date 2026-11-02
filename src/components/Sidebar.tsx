@@ -4,13 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Cancel01Icon, LockPasswordIcon, Logout01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Cancel01Icon, LockPasswordIcon, Logout01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { signOutAction } from "@/actions/auth";
+import InstallApp from "@/components/InstallApp";
 import { LogoMark } from "@/components/Logo";
-import type { NavSection } from "@/lib/navigation";
+import type { NavItem, NavSection } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-type Props = { sections: NavSection[]; userName: string; roleLabel: string };
+type Props = { sections: NavSection[]; tabs: NavItem[]; userName: string; roleLabel: string };
 
 function isActive(pathname: string, href: string) {
   // Section roots ("/admin") match exactly; everything else by prefix.
@@ -73,6 +74,7 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
       </nav>
 
       <div className="space-y-1 border-t border-white/10 pt-4">
+        <InstallApp />
         <div className="px-3 pb-2">
           <p className="truncate text-sm font-medium text-white">{userName}</p>
           <p className="text-xs text-brand-gold">{roleLabel}</p>
@@ -92,9 +94,24 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
   );
 }
 
-/** Fixed sidebar on large screens; a top bar with a slide-in drawer below that. */
+/** The nav item a path belongs to: the longest matching href. */
+function currentItem(pathname: string, items: NavItem[]) {
+  return items
+    .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+}
+
+/**
+ * Large screens: a fixed sidebar. Phones and tablets: an app-style frame, with
+ * a compact top bar (page title, and a back arrow on deeper pages) and a tab
+ * bar at the bottom; "More" opens the full menu as a sheet.
+ */
 export default function Sidebar(props: Props) {
-  const [open, setOpen] = useState(false);
+  const [more, setMore] = useState(false);
+  const pathname = usePathname();
+  const here = currentItem(pathname, [...props.tabs, ...props.sections.flatMap((s) => s.items)]);
+  const back = here && pathname !== here.href ? here.href : undefined;
+  const tab = currentItem(pathname, props.tabs);
 
   return (
     <>
@@ -102,37 +119,77 @@ export default function Sidebar(props: Props) {
         <SidebarBody {...props} />
       </aside>
 
-      <div className="sticky top-0 z-30 flex items-center justify-between bg-brand-charcoal px-4 py-3 lg:hidden print:hidden">
-        <Wordmark />
+      <header className="sticky top-0 z-30 flex min-h-14 items-center gap-1 bg-brand-charcoal px-2 pt-[env(safe-area-inset-top)] text-white lg:hidden print:hidden">
+        {back ? (
+          <Link href={back} aria-label={`Back to ${here!.label}`} className="inline-flex size-11 items-center justify-center rounded-full hover:bg-white/10 active:bg-white/15">
+            <HugeiconsIcon icon={ArrowLeft01Icon} className="size-6" />
+          </Link>
+        ) : (
+          <Link href="/dashboard" aria-label="Pacwoods home" className="inline-flex size-11 items-center justify-center">
+            <LogoMark className="h-7 w-auto" />
+          </Link>
+        )}
+        <p className="min-w-0 truncate text-base font-semibold">{here?.label ?? "Pacwoods"}</p>
+      </header>
+
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-white/10 bg-brand-charcoal pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden"
+      >
+        {props.tabs.map((t) => {
+          // A tab stays lit on its deeper pages too (a job under Jobs).
+          const active = tab === t;
+          return (
+            <Link
+              key={t.href}
+              href={t.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium active:bg-white/10",
+                active ? "text-brand-gold" : "text-white/70",
+              )}
+            >
+              <HugeiconsIcon icon={t.icon} className="size-6" />
+              {t.label}
+              {t.badge ? (
+                <span className="absolute top-2 left-1/2 ml-2 min-w-5 rounded-full bg-brand-gold px-1.5 text-center text-[11px] leading-5 font-semibold text-brand-charcoal tabular-nums">
+                  {t.badge}
+                  <span className="sr-only"> new</span>
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
         <button
           type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={open}
-          className="inline-flex size-11 items-center justify-center rounded-md text-white hover:bg-white/10"
+          onClick={() => setMore(true)}
+          aria-expanded={more}
+          className={cn(
+            "flex h-16 cursor-pointer flex-col items-center justify-center gap-1 text-[11px] font-medium active:bg-white/10",
+            !tab && here ? "text-brand-gold" : "text-white/70",
+          )}
         >
-          <HugeiconsIcon icon={Menu01Icon} className="size-6" />
+          <HugeiconsIcon icon={MoreHorizontalIcon} className="size-6" />
+          More
         </button>
-      </div>
+      </nav>
 
-      {open && (
+      {more && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button
-            type="button"
-            aria-label="Close menu"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-brand-charcoal">
+          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/50" onClick={() => setMore(false)} />
+          <div className="no-scrollbar absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-brand-charcoal pb-[env(safe-area-inset-bottom)]">
+            <div className="sticky top-0 z-10 flex justify-center bg-brand-charcoal pt-2">
+              <span aria-hidden className="h-1.5 w-12 rounded-full bg-white/25" />
+            </div>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => setMore(false)}
               aria-label="Close menu"
-              className="absolute top-4 right-3 inline-flex size-11 items-center justify-center rounded-md text-white hover:bg-white/10"
+              className="absolute top-3 right-3 z-10 inline-flex size-11 items-center justify-center rounded-full text-white hover:bg-white/10"
             >
               <HugeiconsIcon icon={Cancel01Icon} className="size-6" />
             </button>
-            <SidebarBody {...props} onNavigate={() => setOpen(false)} />
+            <SidebarBody {...props} onNavigate={() => setMore(false)} />
           </div>
         </div>
       )}
