@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import ServiceWorker from "@/components/offline/ServiceWorker";
 import "./globals.css";
 
 // Self-hosted (Latin subset, SIL Open Font License in fonts/OFL.txt), so the
@@ -35,7 +36,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${poppins.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

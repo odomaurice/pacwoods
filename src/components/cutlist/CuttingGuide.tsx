@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
@@ -10,6 +10,8 @@ import { Collapsible } from "@/components/cutlist/PlanViewer";
 import { Button } from "@/components/ui/button";
 import { cuttingSteps, type GuideResult, type GuideStep } from "@/lib/cutting/guide";
 import type { PlanSheet } from "@/lib/cutting/types";
+import { isOffline, reportOffline } from "@/lib/offline/connectivity";
+import { outboxItems, outboxItemsOnServer, queueCut, subscribeOutbox } from "@/lib/offline/outbox";
 import { cn } from "@/lib/utils";
 
 export type GuidePart = {
@@ -49,7 +51,18 @@ export default function CuttingGuide({
   const fills = useMemo(() => new Map(parts.map((p) => [p.ref, p.fill])), [parts]);
   const code = (ref: string, copy: number) => `${byRef.get(ref)?.no ?? "?"}.${copy}`;
 
-  const [done, setDone] = useState(() => new Set(progress?.done ?? []));
+  const [saved, setDone] = useState(() => new Set(progress?.done ?? []));
+  // Ticks made offline are on this device until they are sent; show them as made.
+  const waiting = useSyncExternalStore(subscribeOutbox, outboxItems, outboxItemsOnServer);
+  const done = useMemo(() => {
+    const merged = new Set(saved);
+    for (const item of waiting) {
+      if (item.type !== "cut" || item.taskId !== progress?.taskId) continue;
+      if (item.done) merged.add(item.key);
+      else merged.delete(item.key);
+    }
+    return merged;
+  }, [saved, waiting, progress?.taskId]);
   const firstOpen = (i: number) => {
     const steps = guides[i] ?? [];
     const at = steps.findIndex((s) => !done.has(s.key));
@@ -77,7 +90,19 @@ export default function CuttingGuide({
       return next;
     });
     startTransition(async () => {
-      const result = await markCutAction(progress.taskId, key, value);
+      let result: Awaited<ReturnType<typeof markCutAction>> | null = null;
+      if (!isOffline()) {
+        try {
+          result = await markCutAction(progress.taskId, key, value);
+        } catch {
+          reportOffline();
+        }
+      }
+      if (!result) {
+        // No connection: keep the tick on this device; the outbox sends it later.
+        await queueCut(progress.taskId, key, value).catch(() => toast.error("This tick could not be saved. Check the connection."));
+        return;
+      }
       if (!result.ok) {
         toast.error(result.error);
         setDone((d) => {

@@ -37,14 +37,18 @@ export function PhotoUploader({
     setStates(chosen.map(() => ({})));
     const mark = (i: number, s: UploadState) => setStates((prev) => prev.map((p, j) => (j === i ? s : p)));
     let ok = 0;
+    let queued = 0;
     for (const [i, file] of chosen.entries()) {
-      const error = await uploadPhoto(file, { workNumber, kind, taskId }, (percent) => {
+      const outcome = await uploadPhoto(file, { workNumber, kind, taskId }, (percent) => {
         mark(i, { percent });
         setBusy(chosen.length === 1 ? `Uploading ${percent}%` : `Uploading ${i + 1} of ${chosen.length} · ${percent}%`);
       });
-      if (error) {
-        toast.error(error);
+      if (outcome.status === "failed") {
+        toast.error(outcome.error);
         mark(i, { error: true });
+      } else if (outcome.status === "queued") {
+        queued++;
+        mark(i, { queued: true });
       } else {
         ok++;
         mark(i, { done: true });
@@ -53,6 +57,7 @@ export function PhotoUploader({
     setBusy(undefined);
     setFiles([]);
     if (input.current) input.current.value = "";
+    if (queued) toast.info(queued === 1 ? "No connection: the photo is saved on this device and will upload when you're back online." : `No connection: ${queued} photos are saved on this device and will upload when you're back online.`);
     if (ok) {
       toast.success(ok === 1 ? "Photo added." : `${ok} photos added.`);
       router.refresh();

@@ -65,7 +65,8 @@ export default function Planner() {
       deductEdgeBanding: false,
       edgeBandThickness: 1,
       singleSheet: false,
-    });
+      // Re-planned on every keystroke in the visitor's browser.
+    }, "quick");
     return { plan, draw: new Map(parts.map((p) => [p.ref, { ref: p.ref, label: p.label, fill: p.fill, edges: p.edges }])) };
   }, [rows, stock]);
 

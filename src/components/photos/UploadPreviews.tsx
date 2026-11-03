@@ -5,8 +5,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, Tick02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
-/** Where one chosen photo is: not started, uploading (0–100), done or failed. */
-export type UploadState = { percent?: number; done?: boolean; error?: boolean };
+/** Where one chosen photo is: not started, uploading (0–100), done, kept on the device for later, or failed. */
+export type UploadState = { percent?: number; done?: boolean; queued?: boolean; error?: boolean };
 
 /** A local preview of a photo that has been chosen but is not on the server yet. */
 function LocalThumb({ file }: { file: File }) {
@@ -32,14 +32,16 @@ export default function UploadPreviews({
     <ul className={cn("grid grid-cols-4 gap-2 sm:grid-cols-6", className)}>
       {files.map((file, i) => {
         const s = states[i] ?? {};
-        const uploading = s.percent !== undefined && !s.done && !s.error;
+        const uploading = s.percent !== undefined && !s.done && !s.error && !s.queued;
         return (
           <li key={`${file.name}-${file.lastModified}-${i}`} className="relative overflow-hidden rounded-md bg-muted">
             <LocalThumb file={file} />
-            {(uploading || s.done || s.error) && (
+            {(uploading || s.done || s.error || s.queued) && (
               <div className={cn("absolute inset-0 flex items-center justify-center text-sm font-semibold text-white", s.error ? "bg-destructive/70" : s.done ? "bg-brand-charcoal/40" : "bg-brand-charcoal/60")}>
                 {s.error ? (
                   <HugeiconsIcon icon={Alert02Icon} className="size-5" aria-label="Failed" />
+                ) : s.queued ? (
+                  <span className="text-xs">Saved</span>
                 ) : s.done ? (
                   <HugeiconsIcon icon={Tick02Icon} className="size-5" aria-label="Uploaded" />
                 ) : (

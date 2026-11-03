@@ -196,4 +196,26 @@ describe("leftover is kept together", () => {
     // Most of the leftover is one usable piece, not scraps spread over the board.
     expect(s.offcuts[0].w * s.offcuts[0].h).toBeGreaterThan(total * 0.6);
   });
+
+  it("fills one board first, so the last board's leftover is one full-width piece", () => {
+    // A real job, compared with another cutting app: same boards, but the
+    // leftover used to be split across both boards in eight pieces.
+    const parts = [part("A", 2400, 120, 5), part("B", 1400, 200, 2), part("C", 900, 300, 3), part("D", 600, 500), part("E", 1600, 200, 3)];
+    const plan = optimise(parts, [sheet("S")], opts({ kerf: 5 }));
+    expect(plan.sheets).toHaveLength(2);
+    expect(validatePlan(plan, parts, [sheet("S")], opts({ kerf: 5 }))).toEqual([]);
+    const biggest = plan.sheets.flatMap((s) => s.offcuts).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    // 835 x 1220 mm: the board's full width, one cut off the end.
+    expect(Math.min(biggest.w, biggest.h)).toBeGreaterThanOrEqual(830);
+    expect(Math.max(biggest.w, biggest.h)).toBe(1220);
+  });
+
+  it("a quick plan never needs more boards than it must", () => {
+    const parts = [part("A", 700, 500, 6), part("B", 400, 300, 9)];
+    const quick = optimise(parts, [sheet("S")], opts({ kerf: 4 }), "quick");
+    const thorough = optimise(parts, [sheet("S")], opts({ kerf: 4 }));
+    expect(quick.unplaced).toHaveLength(0);
+    expect(quick.sheets.length).toBeGreaterThanOrEqual(thorough.sheets.length);
+    expect(quick.sheets.length).toBeLessThanOrEqual(thorough.totals.sheetLowerBound + 1);
+  });
 });

@@ -377,6 +377,30 @@ continuous backup on prod. Indexes are declared in schemas and synced by a
 Heavy packages (`@react-pdf/renderer`, `exceljs`, `@zxing/browser`) are
 server-only or lazy-loaded so they stay out of the main client bundle.
 
+### ADR-6 Working offline — **ACCEPTED 2026-11-03**
+
+Decided with the business: pages stay readable offline, and only changes that
+are safe to send late are kept on the device. Everything the server must
+decide on the spot (taking or starting a job, queue order, approvals,
+payments) still needs a connection, so no two operators can take the same
+job while disconnected.
+
+- `public/sw.js`, a service worker (production builds only): pages are
+  network-first, and the last copy saved on this device is shown when the
+  server cannot be reached. Pages never opened offline fall back to `/offline`.
+  Build files and photo bytes are cache-first. RSC data, Server Actions and
+  auth go straight to the network.
+- Saved pages hold job and client details, so they are deleted on sign-out
+  and whenever a page lands on `/login`.
+- The outbox (`src/lib/offline/outbox.ts`, IndexedDB) keeps **cut ticks** and
+  **photos** made offline, per user, and sends them when the server answers.
+  Both are idempotent: a cut tick sets a state (`POST /api/production/cuts`,
+  stable across deploys, unlike a Server Action id), and each photo carries
+  a device-made `clientRef`. The server keeps one photo per uploader and
+  `clientRef` (unique partial index; run `npm run db:indexes` after deploying).
+- A refused item (for example the stage was closed meanwhile) is dropped
+  with a message; a 401 or 5xx leaves it waiting.
+
 ## 7. Unresolved business rules
 
 1. ~~Git history and remotes~~ — resolved: fresh history, remote

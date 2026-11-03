@@ -42,6 +42,9 @@ function stored(photo: { storage: string; publicId?: string | null; version?: nu
     : { storage: "gridfs", fileId: photo.fileId!, thumbId: photo.thumbId! };
 }
 
+/** A device-made photo id (crypto.randomUUID). */
+const CLIENT_REF = /^[0-9a-f-]{36}$/i;
+
 /**
  * Saves one photo. Wood photos can be added by staff or the job's operators
  * until the job is finished; finished-work photos belong to a stage and can
@@ -49,12 +52,16 @@ function stored(photo: { storage: string; publicId?: string | null; version?: nu
  */
 export async function savePhoto(
   viewer: Viewer,
-  input: { workNumber: string; kind: PhotoKind; taskId?: string; data: Buffer },
+  input: { workNumber: string; kind: PhotoKind; taskId?: string; data: Buffer; clientRef?: string },
 ) {
   if (input.data.length === 0 || input.data.length > MAX_UPLOAD_BYTES) {
     throw new ServiceError("INVALID", "The photo is empty or larger than 10 MB.");
   }
+  if (input.clientRef !== undefined && !CLIENT_REF.test(input.clientRef)) throw new ServiceError("INVALID", "Bad photo reference.");
   await connectDb();
+  // Sent before (an upload retried after the connection dropped): keep the first.
+  const already = input.clientRef ? await Photo.findOne({ uploadedBy: viewer.id, clientRef: input.clientRef }) : null;
+  if (already) return already;
   const job = await Job.findOne({ workNumber: input.workNumber }).select("_id workNumber status").lean();
   if (!job) throw new ServiceError("NOT_FOUND", "Job not found.");
   if (job.status === "COMPLETED" || job.status === "CANCELLED") throw new ServiceError("CONFLICT", "This job is closed; photos can no longer be added.");
@@ -88,18 +95,29 @@ export async function savePhoto(
   }
 
   const image = await putImage(full.data, thumb, `jobs/${job.workNumber}`);
-  const photo = await Photo.create({
-    jobId: job._id,
-    workNumber: job.workNumber,
-    taskId,
-    kind: input.kind,
-    ...image,
-    width: full.info.width,
-    height: full.info.height,
-    bytes: full.data.length,
-    uploadedBy: viewer.id,
-    uploaderRole: viewer.role,
-  });
+  let photo;
+  try {
+    photo = await Photo.create({
+      jobId: job._id,
+      workNumber: job.workNumber,
+      taskId,
+      kind: input.kind,
+      ...image,
+      width: full.info.width,
+      height: full.info.height,
+      bytes: full.data.length,
+      uploadedBy: viewer.id,
+      uploaderRole: viewer.role,
+      clientRef: input.clientRef,
+    });
+  } catch (error) {
+    // The same photo arrived twice at once: keep the one that won.
+    if (input.clientRef && error instanceof mongoose.mongo.MongoServerError && error.code === 11000) {
+      await deleteImage(image);
+      return (await Photo.findOne({ uploadedBy: viewer.id, clientRef: input.clientRef }))!;
+    }
+    throw error;
+  }
   await recordJobEvent(job._id, {
     type: input.kind === "FINISHED" ? "FINISHED_PHOTO_ADDED" : "MATERIAL_PHOTO_ADDED",
     actorId: viewer.id,

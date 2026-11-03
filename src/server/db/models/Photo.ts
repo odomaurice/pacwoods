@@ -24,11 +24,14 @@ const photoSchema = new Schema(
     bytes: { type: Number },
     uploadedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     uploaderRole: { type: String, required: true },
+    /** The uploading device's own id for this photo, so a retried upload is stored once. */
+    clientRef: { type: String },
   },
   { timestamps: true },
 );
 
 photoSchema.index({ jobId: 1, kind: 1, createdAt: 1 });
+photoSchema.index({ uploadedBy: 1, clientRef: 1 }, { unique: true, partialFilterExpression: { clientRef: { $type: "string" } } });
 photoSchema.index({ taskId: 1, kind: 1 });
 
 export type PhotoDoc = InferSchemaType<typeof photoSchema>;

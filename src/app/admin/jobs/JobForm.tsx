@@ -123,12 +123,12 @@ export default function JobForm({
       const mark = (i: number, s: UploadState) => setUploads((prev) => prev.map((p, j) => (j === i ? s : p)));
       setUploads(photos.map(() => ({})));
       for (const [i, file] of photos.entries()) {
-        const error = await uploadPhoto(file, { workNumber: result.workNumber, kind: "MATERIAL" }, (percent) => {
+        const outcome = await uploadPhoto(file, { workNumber: result.workNumber, kind: "MATERIAL" }, (percent) => {
           mark(i, { percent });
           setProgress(`Uploading photo ${i + 1} of ${photos.length} · ${percent}%`);
         });
-        if (error) toast.error(error);
-        mark(i, error ? { error: true } : { done: true });
+        if (outcome.status === "failed") toast.error(outcome.error);
+        mark(i, outcome.status === "failed" ? { error: true } : outcome.status === "queued" ? { queued: true } : { done: true });
       }
       setProgress(undefined);
       // The cutlist opens in the unit chosen for the materials.

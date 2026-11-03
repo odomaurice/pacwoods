@@ -6,7 +6,7 @@ import { ServiceError } from "@/server/services/users";
 
 const STATUS: Record<ServiceError["code"], number> = { FORBIDDEN: 403, INVALID: 400, DUPLICATE: 409, NOT_FOUND: 404, CONFLICT: 409 };
 
-/** Upload one photo (multipart: file, workNumber, kind, taskId?). */
+/** Upload one photo (multipart: file, workNumber, kind, taskId?, clientRef?). Repeating a clientRef returns the first copy. */
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user || user.mustChangePassword) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -17,10 +17,11 @@ export async function POST(request: Request) {
   const workNumber = String(form.get("workNumber") ?? "");
   const kind = String(form.get("kind") ?? "") as PhotoKind;
   const taskId = form.get("taskId") ? String(form.get("taskId")) : undefined;
+  const clientRef = form.get("clientRef") ? String(form.get("clientRef")) : undefined;
   if (!(file instanceof File) || !PHOTO_KINDS.includes(kind)) return NextResponse.json({ error: "Missing photo." }, { status: 400 });
 
   try {
-    const photo = await savePhoto(user, { workNumber, kind, taskId, data: Buffer.from(await file.arrayBuffer()) });
+    const photo = await savePhoto(user, { workNumber, kind, taskId, clientRef, data: Buffer.from(await file.arrayBuffer()) });
     return NextResponse.json({ id: photo._id.toString() }, { status: 201 });
   } catch (error) {
     if (error instanceof ServiceError) return NextResponse.json({ error: error.message }, { status: STATUS[error.code] });

@@ -9,6 +9,7 @@ import { signOutAction } from "@/actions/auth";
 import InstallApp from "@/components/InstallApp";
 import { LogoMark } from "@/components/Logo";
 import type { NavItem, NavSection } from "@/lib/navigation";
+import { clearSavedPages } from "@/lib/offline/pages";
 import { cn } from "@/lib/utils";
 
 type Props = { sections: NavSection[]; tabs: NavItem[]; userName: string; roleLabel: string };
@@ -89,7 +90,8 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
           <HugeiconsIcon icon={LockPasswordIcon} className="size-5" />
           Change password
         </Link>
-        <form action={signOutAction}>
+        {/* Saved offline pages hold job details: they go with the session. */}
+        <form action={signOutAction} onSubmit={() => void clearSavedPages()}>
           <button type="submit" className={cn(linkClass, "w-full")}>
             <HugeiconsIcon icon={Logout01Icon} className="size-5" />
             Sign out

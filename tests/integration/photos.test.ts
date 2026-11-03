@@ -71,6 +71,26 @@ describe.skipIf(!hasDatabase)("photos (MongoDB)", () => {
     expect(await openPhoto(stranger, photo!._id.toString(), "full")).toBeNull();
   });
 
+  it("stores a photo sent twice under one device reference once", async () => {
+    const clientRef = "4f2d8c1e-6b3a-4e9f-9a71-2c5d0e8b7f13";
+    const before = await Photo.countDocuments({ workNumber });
+    const first = await savePhoto(op, { workNumber, kind: "MATERIAL", data: jpeg, clientRef });
+    const again = await savePhoto(op, { workNumber, kind: "MATERIAL", data: jpeg, clientRef });
+    expect(again._id.toString()).toBe(first._id.toString());
+    // Both at once, as when a retry overlaps a slow first attempt.
+    const ref2 = "9a0b1c2d-3e4f-4a5b-8c6d-7e8f9a0b1c2d";
+    const [x, y] = await Promise.all([
+      savePhoto(op, { workNumber, kind: "MATERIAL", data: jpeg, clientRef: ref2 }),
+      savePhoto(op, { workNumber, kind: "MATERIAL", data: jpeg, clientRef: ref2 }),
+    ]);
+    expect(x._id.toString()).toBe(y._id.toString());
+    expect(await Photo.countDocuments({ workNumber })).toBe(before + 2);
+    // The reference is the uploader's own: another person's upload is not merged into it.
+    const staff = await savePhoto(root, { workNumber, kind: "MATERIAL", data: jpeg, clientRef });
+    expect(staff._id.toString()).not.toBe(first._id.toString());
+    await expect(savePhoto(op, { workNumber, kind: "MATERIAL", data: jpeg, clientRef: "not-a-uuid" })).rejects.toMatchObject({ code: "INVALID" });
+  });
+
   it("requires a finished-work photo before a stage can be completed", async () => {
     await startTask(op, taskId);
     await expect(completeTask(op, taskId, done)).rejects.toMatchObject({ code: "CONFLICT" });

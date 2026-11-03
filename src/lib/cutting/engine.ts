@@ -22,7 +22,7 @@ import type {
   UnplacedReason,
 } from "./types";
 
-export const ENGINE_VERSION = "guillotine-3";
+export const ENGINE_VERSION = "guillotine-4";
 
 type Item = {
   partRef: string;
@@ -41,7 +41,8 @@ type OpenSheet = {
   cuts: Cut[];
 };
 
-type SortKey = "area" | "longest" | "perimeter" | "width";
+/** "given" keeps the order passed in (a seeded shuffle). */
+type SortKey = "area" | "longest" | "perimeter" | "width" | "given";
 /**
  * "corner" packs row by row from the top-left and "column" column by column,
  * so the leftover gathers at the bottom or the right of the board.
@@ -148,6 +149,7 @@ function place(sheet: OpenSheet, item: Item, spot: NonNullable<ReturnType<typeof
 }
 
 function sortItems(items: Item[], key: SortKey) {
+  if (key === "given") return [...items];
   const k = (i: Item) =>
     key === "area" ? i.l * i.w : key === "longest" ? Math.max(i.l, i.w) : key === "perimeter" ? i.l + i.w : Math.min(i.l, i.w);
   return [...items].sort((a, b) => k(b) - k(a) || b.l * b.w - a.l * a.w || a.partRef.localeCompare(b.partRef) || a.copy - b.copy);
@@ -226,6 +228,222 @@ function runStrategy(items: Item[], stocks: StockInput[], options: CutOptions, s
   return { sheets, unplaced };
 }
 
+/**
+ * Packs as many of `pool` as fit onto one fresh sheet of `stock`. With
+ * `within`, the panels are kept to the first `at` millimetres along that
+ * axis: the board is first cut across there, and the rest is one offcut.
+ */
+function fillSheet(
+  pool: Item[],
+  stock: StockInput,
+  options: CutOptions,
+  sort: SortKey,
+  fit: FitRule,
+  split: SplitRule,
+  within?: { axis: "x" | "y"; at: number },
+): OpenSheet | null {
+  const u = usable(stock, options);
+  if (u.w <= 0 || u.h <= 0) return null;
+  const board = { x: options.edgeTrim, y: options.edgeTrim, w: u.w, h: u.h };
+  const sheet: OpenSheet = { stock, free: [board], placements: [], cuts: [] };
+  if (within) {
+    const { axis, at } = within;
+    const rest = (axis === "x" ? board.w : board.h) - at - options.kerf;
+    const first = axis === "x" ? { ...board, w: at } : { ...board, h: at };
+    const offcut = rest > 0 ? (axis === "x" ? { ...board, x: board.x + at + options.kerf, w: rest } : { ...board, y: board.y + at + options.kerf, h: rest }) : null;
+    sheet.free = [first];
+    sheet.cuts.push(
+      axis === "x"
+        ? { x1: board.x + at, y1: board.y, x2: board.x + at, y2: board.y + board.h, order: 0, axis, at, source: board, pieces: [first, offcut] }
+        : { x1: board.x, y1: board.y + at, x2: board.x + board.w, y2: board.y + at, order: 0, axis, at, source: board, pieces: [first, offcut] },
+    );
+  }
+  for (const item of sortItems(pool, sort)) {
+    const spot = findSpot(sheet, item, options, fit);
+    if (spot) place(sheet, item, spot, split, options.kerf);
+  }
+  return sheet;
+}
+
+/** A repeatable shuffle (mulberry32): the same job always gets the same plan. */
+function shuffled<T>(list: T[], seed: number): T[] {
+  let t = seed >>> 0;
+  const next = () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+const usedArea = (sheet: OpenSheet) => sheet.placements.reduce((a, p) => a + p.w * p.h, 0);
+
+/**
+ * How much the leftover is kept together: the sum of each offcut's area
+ * squared. One 1000 × 1000 offcut scores far above four 500 × 500 ones of
+ * the same total, so higher means fewer, larger, more reusable pieces.
+ */
+const togetherness = (sheets: OpenSheet[]) => sheets.reduce((a, s) => a + consolidate(s).offcuts.reduce((n, o) => n + (o.w * o.h) ** 2, 0), 0);
+
+const itemArea = (list: Item[]) => list.reduce((a, i) => a + i.l * i.w, 0);
+const idOf = (item: { partRef: string; copy: number }) => `${item.partRef}#${item.copy}`;
+
+/**
+ * The shortest stretch of a board, along `axis`, for which `attempt` still
+ * succeeds (found by halving), and what it returned there. The rest of that
+ * board is then one full-width offcut.
+ */
+function shortest<T>(stock: StockInput, options: CutOptions, axis: "x" | "y", panelArea: number, attempt: (at: number) => T | null): T | null {
+  const u = usable(stock, options);
+  let hi = axis === "x" ? u.w : u.h;
+  let lo = Math.max(1, Math.min(hi, Math.ceil(panelArea / (axis === "x" ? u.h : u.w))));
+  let best = attempt(hi);
+  if (!best) return null;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const found = attempt(mid);
+    if (found) {
+      best = found;
+      hi = mid;
+    } else lo = mid + 1;
+  }
+  return best;
+}
+
+/** All of `pool` on one board, kept to the shortest stretch of it. */
+function compactBoard(pool: Item[], stock: StockInput, options: CutOptions): OpenSheet | null {
+  let best: OpenSheet | null = null;
+  for (const axis of ["x", "y"] as const) {
+    const sheet = shortest(stock, options, axis, itemArea(pool), (at) => {
+      for (const [sort, fit, split] of RULES) {
+        const sheet = fillSheet(pool, stock, options, sort, fit, split, { axis, at });
+        if (sheet && sheet.placements.length === pool.length) return sheet;
+      }
+      return null;
+    });
+    if (sheet && (!best || togetherness([sheet]) > togetherness([best]))) best = sheet;
+  }
+  return best;
+}
+
+/**
+ * All of `pool` on two boards with the second kept to the shortest stretch:
+ * the panels that pack tightest go on the last board, the rest fill the
+ * first. Finding the split from the last board back is what puts the
+ * leftover in one large piece.
+ */
+function compactPair(pool: Item[], stock: StockInput, options: CutOptions): [OpenSheet, OpenSheet] | null {
+  const u = usable(stock, options);
+  let best: [OpenSheet, OpenSheet] | null = null;
+  for (const axis of ["x", "y"] as const) {
+    const pair = shortest(stock, options, axis, Math.max(0, itemArea(pool) - u.w * u.h), (at) => {
+      for (const [sort, fit, split] of RULES) {
+        const last = fillSheet(pool, stock, options, sort, fit, split, { axis, at });
+        if (!last || last.placements.length === 0 || last.placements.length === pool.length) continue;
+        const placed = new Set(last.placements.map(idOf));
+        const rest = pool.filter((item) => !placed.has(idOf(item)));
+        for (const [sort2, fit2, split2] of RULES) {
+          const first = fillSheet(rest, stock, options, sort2, fit2, split2);
+          if (first && first.placements.length === rest.length) return [first, last] as [OpenSheet, OpenSheet];
+        }
+      }
+      return null;
+    });
+    if (pair && (!best || togetherness(pair) > togetherness(best))) best = pair;
+  }
+  return best;
+}
+
+/**
+ * Sheet by sheet: each board is filled as full as the remaining panels allow
+ * before the next is opened, so the leftover gathers on the last board in as
+ * few, as large pieces as possible, instead of a little on every board.
+ *
+ * Which panels go on the first board decides what is left for the rest, so
+ * this keeps the `beam` best part-built plans at each board (each extended
+ * by its `branch` fullest distinct fills, from the sorted rules and
+ * `shuffles` seeded shuffles). When what is left fits on one board, or on two
+ * of one kind, it also finishes with `compactBoard` or `compactPair`.
+ * Every finished plan is returned; `optimise` ranks them with the rest.
+ */
+type Partial = { sheets: OpenSheet[]; left: Item[]; remaining: Map<string, number>; used: number };
+
+function runFillFirst(items: Item[], stocks: StockInput[], options: CutOptions, beam: number, branch: number, shuffles: number, pairUpTo: number) {
+  const invalid: Unplaced[] = [];
+  const valid = items.filter((item) => {
+    if (item.l > 0 && item.w > 0) return true;
+    invalid.push({ partRef: item.partRef, copy: item.copy, reason: "INVALID_SIZE" });
+    return false;
+  });
+  const finish = (sheets: OpenSheet[], left: Item[]) => ({
+    sheets,
+    unplaced: [...invalid, ...left.map((item) => ({ partRef: item.partRef, copy: item.copy, reason: reasonFor(item, stocks, options, sheets.length) }))],
+  });
+
+  const done: Array<ReturnType<typeof finish>> = [];
+  let states: Partial[] = [{ sheets: [], left: valid, remaining: new Map(stocks.map((s) => [s.ref, s.quantity])), used: 0 }];
+  while (states.length > 0) {
+    const next: Partial[] = [];
+    for (const state of states) {
+      if (state.left.length === 0 || (options.singleSheet && state.sheets.length >= 1)) {
+        done.push(finish(state.sheets, state.left));
+        continue;
+      }
+      // Every distinct way to fill the next board, fullest first.
+      const fills = new Map<string, { sheet: OpenSheet; key: number[] }>();
+      const consider = (sheet: OpenSheet | null) => {
+        if (!sheet || sheet.placements.length === 0) return;
+        // The most panel area on this board, then its leftover kept together, then the smaller board.
+        const key = [-usedArea(sheet), -togetherness([sheet]), sheet.stock.length * sheet.stock.width];
+        const id = `${sheet.stock.ref}:${sheet.placements.map(idOf).sort().join(",")}`;
+        const seen = fills.get(id);
+        if (!seen || compareKeys(key, seen.key) < 0) fills.set(id, { sheet, key });
+      };
+      for (const stock of stocks) {
+        const boards = state.remaining.get(stock.ref) ?? 0;
+        if (boards <= 0) continue;
+        const pool = state.left.filter((item) => compatible(item, stock, options));
+        if (pool.length === 0) continue;
+        for (const [sort, fit, split] of RULES) consider(fillSheet(pool, stock, options, sort, fit, split));
+        // Shuffled orders reach mixes the sorted ones never try.
+        for (let r = 0; r < shuffles; r++) {
+          const order = shuffled(pool, r * 7919 + pool.length);
+          for (const fit of FITS) for (const split of SPLITS) consider(fillSheet(order, stock, options, "given", fit, split));
+        }
+        if (pool.length !== state.left.length) continue;
+        // The last board, or the last two: kept to the shortest stretch.
+        const u = usable(stock, options);
+        const panels = itemArea(pool);
+        if (panels <= u.w * u.h) consider(compactBoard(pool, stock, options));
+        if (boards >= 2 && !options.singleSheet && pool.length <= pairUpTo && panels > u.w * u.h && panels <= 2 * u.w * u.h) {
+          const pair = compactPair(pool, stock, options);
+          if (pair) done.push(finish([...state.sheets, ...pair], []));
+        }
+      }
+      if (fills.size === 0) {
+        done.push(finish(state.sheets, state.left));
+        continue;
+      }
+      for (const { sheet } of [...fills.values()].sort((a, b) => compareKeys(a.key, b.key)).slice(0, branch)) {
+        const placed = new Set(sheet.placements.map(idOf));
+        const remaining = new Map(state.remaining);
+        remaining.set(sheet.stock.ref, (remaining.get(sheet.stock.ref) ?? 0) - 1);
+        next.push({ sheets: [...state.sheets, sheet], left: state.left.filter((item) => !placed.has(idOf(item))), remaining, used: state.used + usedArea(sheet) });
+      }
+    }
+    // Keep the part-built plans that have placed the most so far.
+    const together = new Map(next.map((st) => [st, togetherness(st.sheets)]));
+    states = next.sort((a, b) => b.used - a.used || together.get(b)! - together.get(a)!).slice(0, beam);
+  }
+  return done;
+}
+
 export function expandItems(parts: PartInput[], options: CutOptions): Item[] {
   const items: Item[] = [];
   for (const part of parts) {
@@ -240,34 +458,44 @@ export function expandItems(parts: PartInput[], options: CutOptions): Item[] {
 const SORTS: SortKey[] = ["area", "longest", "perimeter", "width"];
 const FITS: FitRule[] = ["shortSide", "area", "corner", "column"];
 const SPLITS: SplitRule[] = ["shorterLeftover", "longerLeftover"];
+const RULES = SORTS.flatMap((sort) => FITS.flatMap((fit) => SPLITS.map((split) => [sort, fit, split] as const)));
 
-export function optimise(parts: PartInput[], stocks: StockInput[], options: CutOptions): Plan {
+/**
+ * How hard the sheet-by-sheet search works. "thorough" is for saved
+ * cutlists; "quick" for previews that re-plan on every keystroke. Large jobs
+ * narrow the search so a plan stays within a second or two.
+ */
+export type Effort = "thorough" | "quick";
+function searchWidth(effort: Effort, panels: number) {
+  if (effort === "quick") return { beam: 1, branch: 1, shuffles: 0, pairUpTo: 24 };
+  if (panels <= 40) return { beam: 6, branch: 8, shuffles: 12, pairUpTo: 40 };
+  if (panels <= 150) return { beam: 3, branch: 4, shuffles: 4, pairUpTo: 0 };
+  return { beam: 1, branch: 1, shuffles: 0, pairUpTo: 0 };
+}
+
+export function optimise(parts: PartInput[], stocks: StockInput[], options: CutOptions, effort: Effort = "thorough"): Plan {
   const items = expandItems(parts, options);
-  let best: { result: ReturnType<typeof runStrategy>; name: string; key: number[] } | null = null;
-
+  const { beam, branch, shuffles, pairUpTo } = searchWidth(effort, items.length);
+  const candidates: Array<{ result: ReturnType<typeof runStrategy>; name: string }> = runFillFirst(items, stocks, options, beam, branch, shuffles, pairUpTo).map((result) => ({
+    result,
+    name: "fill-first",
+  }));
   for (const sort of SORTS) {
     for (const fit of FITS) {
       for (const split of SPLITS) {
-        const result = runStrategy(items, stocks, options, sort, fit, split);
-        const sheetArea = result.sheets.reduce((a, s) => a + s.stock.length * s.stock.width, 0);
-        // Leftover outside each sheet's largest offcut: scraps. Fewer is better.
-        const scattered = result.sheets.reduce((a, s) => {
-          const offcuts = consolidate(s).offcuts;
-          const total = offcuts.reduce((n, o) => n + o.w * o.h, 0);
-          return a + total - Math.max(0, ...offcuts.map((o) => o.w * o.h));
-        }, 0);
-        const pieces = result.sheets.reduce((a, s) => a + consolidate(s).offcuts.length, 0);
-        // Most parts placed, then fewest sheets, then least sheet area, then
-        // the leftover in the fewest pieces, then the least of it in scraps,
-        // then the emptiest last sheet.
-        const last = result.sheets.at(-1);
-        const lastUsed = last ? last.placements.reduce((a, p) => a + p.w * p.h, 0) : 0;
-        const key = [result.unplaced.length, result.sheets.length, sheetArea, pieces, scattered, lastUsed];
-        if (!best || compareKeys(key, best.key) < 0) {
-          best = { result, name: `${sort}/${fit}/${split}`, key };
-        }
+        candidates.push({ result: runStrategy(items, stocks, options, sort, fit, split), name: `${sort}/${fit}/${split}` });
       }
     }
+  }
+
+  let best: { result: ReturnType<typeof runStrategy>; name: string; key: number[] } | null = null;
+  for (const { result, name } of candidates) {
+    const sheetArea = result.sheets.reduce((a, s) => a + s.stock.length * s.stock.width, 0);
+    const pieces = result.sheets.reduce((a, s) => a + consolidate(s).offcuts.length, 0);
+    // Most parts placed, then fewest sheets, then least sheet area, then the
+    // leftover kept together in the largest pieces, then in the fewest.
+    const key = [result.unplaced.length, result.sheets.length, sheetArea, -togetherness(result.sheets), pieces];
+    if (!best || compareKeys(key, best.key) < 0) best = { result, name, key };
   }
   return buildPlan(best!.result, best!.name, parts, stocks, options);
 }
