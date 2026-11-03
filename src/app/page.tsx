@@ -424,25 +424,40 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="px-4 py-12 text-white sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-[1fr_auto]">
-          <div className="space-y-3">
-            <span className="text-xl">
+      <footer className="px-4 pt-16 text-white sm:px-8">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-12 pb-14 md:grid-cols-[1.6fr_1fr_1fr]">
+          <div className="col-span-2 max-w-sm space-y-5 md:col-span-1">
+            <Link href="/" aria-label="Pacwoods home" className="inline-block text-2xl">
               <Logo />
-            </span>
-            <p className="text-sm text-white/70">Industrial Wood Processing Centre · Panel cutting · CNC machining · Edge-banding services</p>
+            </Link>
+            <p className="leading-relaxed text-white/70">
+              Industrial Wood Processing Centre. Panel cutting, CNC machining and edge-banding, planned to save board and tracked online.
+            </p>
             <p className="text-sm text-white/50">A joint venture of Ominya Interiors & PAN Gas</p>
           </div>
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/80 sm:flex-col">
-            {nav.map((n) => (
-              <a key={n.href} href={n.href} className="hover:text-brand-gold">
-                {n.label}
-              </a>
-            ))}
-            <Link href={account.href} className="hover:text-brand-gold">
+          <nav aria-label="Footer" className="space-y-4">
+            <p className="text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase">Explore</p>
+            <ul className="space-y-3 text-white/80">
+              {nav.map((n) => (
+                <li key={n.href}>
+                  <a href={n.href} className="transition-colors hover:text-brand-gold">
+                    {n.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="space-y-4">
+            <p className="text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase">Your account</p>
+            <p className="text-white/70">Follow every job from the counter to collection.</p>
+            <Link href={account.href} className={buttonVariants({ variant: "gold", className: "h-11 rounded-full px-6 text-sm font-semibold" })}>
               {account.label}
             </Link>
-          </nav>
+          </div>
+        </div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-white/10 py-6 text-sm text-white/50 sm:flex-row sm:items-center sm:justify-between">
+          <span>© {new Date().getFullYear()} Pacwoods. All rights reserved.</span>
+          <span>Precision Processing. Better Production.</span>
         </div>
       </footer>
     </div>

@@ -306,6 +306,38 @@ export async function getClient(clientId: string) {
   return user ? { profile, user } : null;
 }
 
+/**
+ * Finds a client by what staff type at the counter: a phone number in any
+ * form (0803 123 4567, +234…) or a client number (PCL-000001, or just 1).
+ */
+export async function findClientByNumber(query: string) {
+  const q = query.trim();
+  if (!q) return null;
+  await connectDb();
+  let profile = null;
+  const digits = q.replace(/^pcl-?/i, "");
+  if (/^pcl-?\d+$/i.test(q) || /^\d{1,6}$/.test(q)) {
+    profile = await ClientProfile.findOne({ clientNumber: `PCL-${digits.padStart(6, "0")}` }).lean();
+  }
+  if (!profile) {
+    const phone = normalizePhone(q);
+    const user = phone ? await User.findOne({ phone, role: "CLIENT" }).select("_id").lean() : null;
+    profile = user ? await ClientProfile.findOne({ userId: user._id }).lean() : null;
+  }
+  if (!profile) return null;
+  const user = await User.findById(profile.userId).select("name phone email status").lean();
+  if (!user) return null;
+  return {
+    id: profile._id.toString(),
+    clientNumber: profile.clientNumber,
+    name: user.name,
+    businessName: profile.businessName ?? undefined,
+    phone: formatPhone(user.phone) || undefined,
+    email: user.email ?? undefined,
+    active: user.status === "ACTIVE",
+  };
+}
+
 /** Active clients for pickers, labelled "Business — Name (PCL-000001)". */
 export async function listActiveClientOptions() {
   await connectDb();

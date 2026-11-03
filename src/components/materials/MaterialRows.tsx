@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SUPPLIED_BY, SUPPLIED_BY_LABELS, jobMaterialsSchema, type JobMaterialInput, type SuppliedBy } from "@/lib/job-materials";
+import { fromMm, toMm, type LengthUnit } from "@/lib/units";
 
 export type CatalogueOption = { id: string; name: string; thicknessMm: number; sheetLengthMm: number; sheetWidthMm: number };
 
@@ -14,12 +15,13 @@ export type MaterialRow = { materialId: string; name: string; thicknessMm: strin
 
 const OTHER = "__other";
 
-export const toRow = (m: Partial<JobMaterialInput>): MaterialRow => ({
+/** A stored line (millimetres) as editable text, sheet sizes in `unit`. */
+export const toRow = (m: Partial<JobMaterialInput>, unit: LengthUnit = "mm"): MaterialRow => ({
   materialId: m.materialId ?? (m.name ? OTHER : ""),
   name: m.name ?? "",
-  thicknessMm: m.thicknessMm?.toString() ?? "",
-  sheetLengthMm: m.sheetLengthMm?.toString() ?? "",
-  sheetWidthMm: m.sheetWidthMm?.toString() ?? "",
+  thicknessMm: m.thicknessMm ? fromMm(m.thicknessMm, unit) : "",
+  sheetLengthMm: m.sheetLengthMm ? fromMm(m.sheetLengthMm, unit) : "",
+  sheetWidthMm: m.sheetWidthMm ? fromMm(m.sheetWidthMm, unit) : "",
   sheets: m.sheets?.toString() ?? "1",
   suppliedBy: m.suppliedBy ?? "",
   note: m.note ?? "",
@@ -27,16 +29,27 @@ export const toRow = (m: Partial<JobMaterialInput>): MaterialRow => ({
 
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 
-/** The filled-in rows, validated: the items to save, or the first problem. */
-export function readRows(rows: MaterialRow[]): { items: JobMaterialInput[] } | { error: string } {
+const size = (s: string, unit: LengthUnit) => {
+  const n = num(s);
+  return n === undefined ? undefined : Math.round(toMm(n, unit));
+};
+
+/** Thickness keeps a tenth of a millimetre (e.g. 0.75 in → 19.1 mm). */
+const thickness = (s: string, unit: LengthUnit) => {
+  const n = num(s);
+  return n === undefined ? undefined : toMm(n, unit);
+};
+
+/** The filled-in rows, validated and in millimetres: the items to save, or the first problem. */
+export function readRows(rows: MaterialRow[], unit: LengthUnit = "mm"): { items: JobMaterialInput[] } | { error: string } {
   const items = rows
     .filter((r) => r.name.trim() || r.materialId)
     .map((r) => ({
       materialId: r.materialId && r.materialId !== OTHER ? r.materialId : undefined,
       name: r.name,
-      thicknessMm: num(r.thicknessMm),
-      sheetLengthMm: num(r.sheetLengthMm),
-      sheetWidthMm: num(r.sheetWidthMm),
+      thicknessMm: thickness(r.thicknessMm, unit),
+      sheetLengthMm: size(r.sheetLengthMm, unit),
+      sheetWidthMm: size(r.sheetWidthMm, unit),
       sheets: Number(r.sheets),
       suppliedBy: r.suppliedBy || undefined,
       note: r.note || undefined,
@@ -50,12 +63,23 @@ export function readRows(rows: MaterialRow[]): { items: JobMaterialInput[] } | {
  * (which fills thickness and sheet size) or type any material, then say how
  * many sheets and who supplied them.
  */
-export default function MaterialRows({ rows, onChange, catalogue }: { rows: MaterialRow[]; onChange: (rows: MaterialRow[]) => void; catalogue: CatalogueOption[] }) {
+export default function MaterialRows({
+  rows,
+  onChange,
+  catalogue,
+  unit = "mm",
+}: {
+  rows: MaterialRow[];
+  onChange: (rows: MaterialRow[]) => void;
+  catalogue: CatalogueOption[];
+  /** The unit sizes and thickness are typed in; everything is saved in millimetres. */
+  unit?: LengthUnit;
+}) {
   const set = (i: number, patch: Partial<MaterialRow>) => onChange(rows.map((row, j) => (j === i ? { ...row, ...patch } : row)));
 
   function pick(i: number, id: string) {
     const m = catalogue.find((c) => c.id === id);
-    if (m) set(i, { materialId: id, name: m.name, thicknessMm: String(m.thicknessMm), sheetLengthMm: String(m.sheetLengthMm), sheetWidthMm: String(m.sheetWidthMm) });
+    if (m) set(i, { materialId: id, name: m.name, thicknessMm: fromMm(m.thicknessMm, unit), sheetLengthMm: fromMm(m.sheetLengthMm, unit), sheetWidthMm: fromMm(m.sheetWidthMm, unit) });
     else set(i, { materialId: id, name: id === OTHER ? "" : rows[i].name });
   }
 
@@ -88,15 +112,15 @@ export default function MaterialRows({ rows, onChange, catalogue }: { rows: Mate
             <Input id={`m-${i}-sheets`} inputMode="numeric" className="h-10 bg-card" value={r.sheets} onChange={(e) => set(i, { sheets: e.target.value })} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor={`m-${i}-t`}>Thickness (mm)</Label>
+            <Label htmlFor={`m-${i}-t`}>Thickness ({unit})</Label>
             <Input id={`m-${i}-t`} inputMode="decimal" className="h-10 bg-card" value={r.thicknessMm} onChange={(e) => set(i, { thicknessMm: e.target.value })} />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor={`m-${i}-l`}>Sheet size (mm)</Label>
+            <Label htmlFor={`m-${i}-l`}>Sheet size ({unit})</Label>
             <span className="flex items-center gap-1.5">
-              <Input id={`m-${i}-l`} aria-label="Sheet length" inputMode="numeric" className="h-10 bg-card" placeholder="2440" value={r.sheetLengthMm} onChange={(e) => set(i, { sheetLengthMm: e.target.value })} />
+              <Input id={`m-${i}-l`} aria-label="Sheet length" inputMode="numeric" className="h-10 bg-card" placeholder={fromMm(2440, unit)} value={r.sheetLengthMm} onChange={(e) => set(i, { sheetLengthMm: e.target.value })} />
               <span aria-hidden>×</span>
-              <Input aria-label="Sheet width" inputMode="numeric" className="h-10 bg-card" placeholder="1220" value={r.sheetWidthMm} onChange={(e) => set(i, { sheetWidthMm: e.target.value })} />
+              <Input aria-label="Sheet width" inputMode="numeric" className="h-10 bg-card" placeholder={fromMm(1220, unit)} value={r.sheetWidthMm} onChange={(e) => set(i, { sheetWidthMm: e.target.value })} />
             </span>
           </div>
           <div className="space-y-1 sm:col-span-2">

@@ -50,15 +50,15 @@ export default function LoginForm() {
         error={errors.password?.message}
         {...register("password")}
       />
-      <Button type="submit" disabled={pending} className="h-11 w-full">
+      <p className="-mt-2 text-right text-sm">
+        <Link href="/forgot-password" className="font-medium text-brand-gold-deep hover:underline underline-offset-4">
+          Forgot your password?
+        </Link>
+      </p>
+      <Button type="submit" disabled={pending} className="h-12 w-full text-base">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <p className="text-sm text-muted-foreground">
-        <Link href="/forgot-password" className="font-medium text-foreground underline underline-offset-4">
-          Forgot your password?
-        </Link>{" "}
-        No email on your account? Ask Pacwoods at the counter.
-      </p>
+      <p className="text-center text-sm text-muted-foreground">No email on your account? Ask Pacwoods at the counter.</p>
     </form>
   );
 }

@@ -26,7 +26,7 @@ export default function MaterialsEditor({
   onDone: () => void;
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState<MaterialRow[]>(() => (initial.length ? initial : suggested.length ? suggested : [{}]).map(toRow));
+  const [rows, setRows] = useState<MaterialRow[]>(() => (initial.length ? initial : suggested.length ? suggested : [{}]).map((m) => toRow(m)));
   const [pending, startTransition] = useTransition();
 
   function save() {

@@ -523,8 +523,11 @@ carry machining notes in the cutlist; the CNC operator sees only the panels
 with notes. No time estimate for CNC yet: there are no machine figures to
 base one on.
 
-**New jobs (2026-11-02)** are created in three steps: client and materials
-(pick or register the client, then the boards), job details, cutlist. The
-boards are saved with the job and start its cutlist's stock sheets. The steps
-open the Admin overview; the Super Admin overview stays the command centre.
-Operators see only their own stage's information.
+**New jobs (2026-11-03)** are where Admins land after signing in (the
+overview stays in the sidebar; the Super Admin still lands on it). One dialog
+at a time over a blurred page: the client's phone or client number (a known
+client is shown to confirm; an unknown number opens the new-client form with it
+filled in), then the job with its materials (in a chosen unit: mm, cm, m, in or
+ft), whether they are in the workshop and photos of the wood. Saving opens the
+cutlist in the same unit, starting from those boards. Operators see only their
+own stage's information.

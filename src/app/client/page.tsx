@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Alert02Icon, Briefcase01Icon, CheckmarkCircle02Icon, Layers01Icon, Settings02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { CommandHeader } from "@/components/dashboard/CommandCentre";
 import EmptyState from "@/components/EmptyState";
@@ -45,13 +46,14 @@ export default async function ClientOverview() {
     <div className="space-y-6">
       <CommandHeader
         name={user.name}
+        subtitle="Where each of your jobs is."
         timeZone={(await getSettings()).timeZone}
         figures={[
-          { label: "All jobs", value: jobs.length, href: "/client/jobs" },
-          { label: "Active", value: active.length, href: "/client/jobs" },
-          { label: "Being cut or edged", value: inProduction, href: "/client/jobs" },
-          { label: "Completed", value: jobs.filter((j) => j.status === "COMPLETED").length, href: "/client/jobs" },
-          { label: "My open reports", value: openReports, href: "/client/jobs", alert: true },
+          { label: "All jobs", value: jobs.length, href: "/client/jobs", icon: Briefcase01Icon },
+          { label: "Active", value: active.length, href: "/client/jobs", icon: Layers01Icon },
+          { label: "In production", value: inProduction, href: "/client/jobs", icon: Settings02Icon },
+          { label: "Completed", value: jobs.filter((j) => j.status === "COMPLETED").length, href: "/client/jobs", icon: CheckmarkCircle02Icon },
+          { label: "My open reports", value: openReports, href: "/client/jobs", alert: true, icon: Alert02Icon },
         ]}
         actions={
           <>
@@ -77,7 +79,7 @@ export default async function ClientOverview() {
               const done = applicable.filter((s) => s.state === "done").length;
               const current = v.steps.find((s) => s.state === "current");
               return (
-                <li key={v.job.workNumber} className="space-y-3 rounded-lg bg-card p-5">
+                <li key={v.job.workNumber} className="space-y-3 panel p-6">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono font-semibold">{v.job.workNumber}</span>
                     <JobStatusBadge status={v.job.status} />
@@ -107,7 +109,7 @@ export default async function ClientOverview() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section aria-labelledby="photos" className="rounded-lg bg-card p-5">
+        <section aria-labelledby="photos" className="panel p-6">
           <h2 id="photos" className="mb-3 font-semibold">
             Latest photos
           </h2>
@@ -127,7 +129,7 @@ export default async function ClientOverview() {
           )}
         </section>
 
-        <section aria-labelledby="updates" className="rounded-lg bg-card p-5">
+        <section aria-labelledby="updates" className="panel p-6">
           <h2 id="updates" className="mb-3 font-semibold">
             Latest updates
           </h2>

@@ -169,7 +169,7 @@ function Tool({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex size-10 items-center justify-center rounded-md text-brand-slate hover:bg-muted disabled:opacity-40",
+        "inline-flex size-10 cursor-pointer items-center justify-center rounded-full text-brand-slate hover:bg-muted disabled:opacity-40",
         pressed && "bg-muted text-brand-charcoal",
       )}
     >

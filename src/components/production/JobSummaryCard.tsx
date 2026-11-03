@@ -38,7 +38,7 @@ export default async function JobSummaryCard({
   const show = { work: !stage, material: stage !== "EDGING", panels: !stage || stage === "CUTTING", cnc: stage === "CNC", banding: !stage || stage === "EDGING" };
 
   return (
-    <article className="overflow-hidden rounded-lg bg-card">
+    <article className="overflow-hidden panel">
       <div className={cn("flex items-start bg-brand-charcoal text-white", compact ? "gap-3 p-3" : "gap-4 p-4")}>
         <div className={cn("min-w-0 flex-1", compact ? "space-y-0.5" : "space-y-1")}>
           {header}
@@ -95,7 +95,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground uppercase">{label}</dt>
-      <dd className="font-medium break-words">{children}</dd>
+      <dd className="font-medium wrap-break-word">{children}</dd>
     </div>
   );
 }

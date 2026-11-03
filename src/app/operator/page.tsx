@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Alert02Icon, CheckmarkCircle02Icon, Clock01Icon, Task01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { DailyBarChart } from "@/components/dashboard/Charts";
 import { CommandHeader } from "@/components/dashboard/CommandCentre";
@@ -34,12 +35,13 @@ export default async function OperatorOverview() {
     <div className="space-y-6">
       <CommandHeader
         name={user.name}
+        subtitle="Your work for today."
         timeZone={(await getSettings()).timeZone}
         figures={[
-          { label: "In my queue", value: stats.waiting, href: "/operator/queue" },
-          { label: "Completed this week", value: stats.completedThisWeek, href: "/operator/history" },
-          { label: "Hours worked this week", value: stats.hoursThisWeek, href: "/operator/history" },
-          { label: "My open reports", value: openIssues, href: "/operator", alert: true },
+          { label: "In my queue", value: stats.waiting, href: "/operator/queue", icon: Task01Icon },
+          { label: "Completed this week", value: stats.completedThisWeek, href: "/operator/history", icon: CheckmarkCircle02Icon },
+          { label: "Hours worked this week", value: stats.hoursThisWeek, href: "/operator/history", icon: Clock01Icon },
+          { label: "My open reports", value: openIssues, href: "/operator", alert: true, icon: Alert02Icon },
         ]}
         actions={
           <Link href="/operator/queue" className={buttonVariants({ variant: "gold" })}>
@@ -92,7 +94,7 @@ export default async function OperatorOverview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <DailyBarChart data={stats.completedPerDay} title="Work I completed" unit="Stages completed" />
 
-        <section aria-labelledby="recent" className="rounded-lg bg-card p-5">
+        <section aria-labelledby="recent" className="panel p-6">
           <div className="mb-3 flex items-center">
             <h2 id="recent" className="font-semibold">
               Recently completed

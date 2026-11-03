@@ -11,8 +11,8 @@ export default async function LoginPage() {
 
   return (
     <AuthFrame
-      title="Sign in"
-      description="Use the phone number or email and the password Pacwoods gave you."
+      title="Welcome back"
+      description="Sign in with the phone number or email and the password Pacwoods gave you."
     >
       <LoginForm />
     </AuthFrame>

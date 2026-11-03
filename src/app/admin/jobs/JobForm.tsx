@@ -15,7 +15,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/lib/payments";
-import type { JobMaterialInput } from "@/lib/job-materials";
+import MaterialRows, { readRows, toRow, type CatalogueOption, type MaterialRow } from "@/components/materials/MaterialRows";
+import { LENGTH_UNITS, UNIT_LABELS, type LengthUnit } from "@/lib/units";
 import { jobSchema, type JobInput } from "@/lib/schemas";
 
 type ClientOption = { id: string; label: string };
@@ -35,8 +36,11 @@ export default function JobForm({
   defaultClientId?: string;
   /** Picked in the client step: shown, with a link back to change it. */
   chosenClient?: string;
-  /** The new-job flow: the boards and their arrival come from step 1. */
-  flow?: { materials: JobMaterialInput[]; materialsAvailable: boolean; onBack: () => void };
+  /**
+   * The new-job dialog: the job's boards (in a chosen unit, with photos of the
+   * wood) are entered here too, and saving goes straight on to the cutlist.
+   */
+  flow?: { catalogue: CatalogueOption[]; onBack: () => void };
   /** Editing a draft: the client cannot change, so it rides along unseen. */
   existing?: { workNumber: string; values: JobInput };
 }) {
@@ -45,6 +49,8 @@ export default function JobForm({
   const [photos, setPhotos] = useState<File[]>([]);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [progress, setProgress] = useState<string>();
+  const [unit, setUnit] = useState<LengthUnit>("mm");
+  const [rows, setRows] = useState<MaterialRow[]>(() => [toRow({})]);
   const [pending, startTransition] = useTransition();
   const editing = Boolean(existing);
   const {
@@ -59,6 +65,36 @@ export default function JobForm({
       : { clientId: defaultClientId ?? "", cutting: true, edging: false, cnc: false, materialsAvailable: false, title: "", clientNotes: "", internalNotes: "", payment: { status: "UNPAID", amount: "", method: "", paidOn: new Date().toISOString().slice(0, 10), note: "" } },
   });
   const paymentStatus = useWatch({ control, name: "payment.status" });
+
+  const woodPhotos = (
+    <div className="space-y-2">
+      <Label htmlFor="wood-photos">Photos of the wood (optional)</Label>
+      <input
+        id="wood-photos"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        className="block w-full text-sm file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-secondary file:px-5 file:py-2.5 file:font-semibold"
+        onChange={(e) => {
+          setPhotos((prev) => [...prev, ...(e.target.files ?? [])].slice(0, 12));
+          e.target.value = "";
+        }}
+      />
+      {photos.length > 0 && (
+        <>
+          <UploadPreviews
+            files={photos}
+            states={uploads}
+            onRemove={pending ? undefined : (i) => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+          />
+          <p className="text-sm text-muted-foreground">
+            {photos.length} photo{photos.length === 1 ? "" : "s"} will be added to the job{photos.length === 12 ? " (12 at most)" : ""}.
+          </p>
+        </>
+      )}
+    </div>
+  );
   const payErrors = errors.payment;
 
   const onSubmit = handleSubmit((values) => {
@@ -70,7 +106,16 @@ export default function JobForm({
         if (result && !result.ok) setServerError(result.error);
         return;
       }
-      const result = await createJobAction(flow ? { ...details, clientId, materials: flow.materials, materialsAvailable: flow.materialsAvailable } : { ...details, clientId });
+      let materials;
+      if (flow) {
+        const read = readRows(rows, unit);
+        if ("error" in read) {
+          setServerError(read.error);
+          return;
+        }
+        materials = read.items;
+      }
+      const result = await createJobAction(flow ? { ...details, clientId, materials } : { ...details, clientId });
       if (!result.ok) {
         setServerError(result.error);
         return;
@@ -86,12 +131,13 @@ export default function JobForm({
         mark(i, error ? { error: true } : { done: true });
       }
       setProgress(undefined);
-      router.push(flow ? `/admin/jobs/${result.workNumber}/cutlist` : `/admin/jobs/${result.workNumber}`);
+      // The cutlist opens in the unit chosen for the materials.
+      router.push(flow ? `/admin/jobs/${result.workNumber}/cutlist?unit=${unit}` : `/admin/jobs/${result.workNumber}`);
     });
   });
 
   return (
-    <form onSubmit={onSubmit} noValidate className="max-w-xl space-y-6">
+    <form onSubmit={onSubmit} noValidate className={flow ? "space-y-6" : "max-w-xl space-y-6"}>
       {serverError && (
         <Alert variant="destructive">
           <AlertDescription>{serverError}</AlertDescription>
@@ -138,54 +184,63 @@ export default function JobForm({
       <FormField id="title" label="Title (optional)" placeholder="e.g. Kitchen cabinets" error={errors.title?.message} {...register("title")} />
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Work requested</legend>
-        <label className="flex min-h-11 items-center gap-3 text-sm">
-          <input type="checkbox" className="size-5 accent-brand-charcoal" {...register("cutting")} />
-          Cutting
-        </label>
-        <label className="flex min-h-11 items-center gap-3 text-sm">
-          <input type="checkbox" className="size-5 accent-brand-charcoal" {...register("edging")} />
-          Edging
-        </label>
-        <label className="flex min-h-11 items-start gap-3 text-sm">
-          <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("cnc")} />
-          <span>
-            CNC machining
-            <span className="block text-muted-foreground">Drilling, routing or grooves on the CNC, after cutting and before edging. Add the details per panel in the cutlist.</span>
-          </span>
-        </label>
+        <legend className="mb-2 text-sm font-medium">Work requested</legend>
+        {/* In work order: cutting, then CNC machining, then edging. */}
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["cutting", "Cutting"],
+              ["cnc", "CNC machining"],
+              ["edging", "Edging"],
+            ] as const
+          ).map(([name, label]) => (
+            <label
+              key={name}
+              className="flex h-11 cursor-pointer items-center gap-2.5 rounded-full border border-border bg-card px-5 text-sm font-medium transition-colors select-none hover:bg-muted has-checked:border-brand-charcoal has-checked:bg-brand-charcoal has-checked:text-white"
+            >
+              <input type="checkbox" className="size-4 accent-brand-gold" {...register(name)} />
+              {label}
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">CNC machining is drilling, routing or grooves, done after cutting and before edging; add the details per panel in the cutlist.</p>
         {errors.cutting && <p className="text-sm text-destructive">{errors.cutting.message}</p>}
       </fieldset>
 
-      {!editing && (
-        <div className="space-y-2">
-          <Label htmlFor="wood-photos">Photos of the wood (optional)</Label>
-          <input
-            id="wood-photos"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-4 file:py-2.5 file:font-medium"
-            onChange={(e) => {
-              setPhotos((prev) => [...prev, ...(e.target.files ?? [])].slice(0, 12));
-              e.target.value = "";
-            }}
-          />
-          {photos.length > 0 && (
-            <>
-              <UploadPreviews
-                files={photos}
-                states={uploads}
-                onRemove={pending ? undefined : (i) => setPhotos((prev) => prev.filter((_, j) => j !== i))}
-              />
-              <p className="text-sm text-muted-foreground">
-                {photos.length} photo{photos.length === 1 ? "" : "s"} will be added to the job{photos.length === 12 ? " (12 at most)" : ""}.
-              </p>
-            </>
-          )}
-        </div>
+      {flow && (
+        <section aria-labelledby="job-materials" className="space-y-3 rounded-xl bg-muted/50 p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 id="job-materials" className="font-semibold">
+                Materials
+              </h3>
+              <p className="text-sm text-muted-foreground">The boards for this job. Not sure yet? Leave them empty and add them on the job later.</p>
+            </div>
+            <label className="space-y-1 text-sm">
+              <span className="block font-medium">Measure in</span>
+              <select className="h-10 rounded-md border border-input bg-card px-3 text-sm" value={unit} onChange={(e) => setUnit(e.target.value as LengthUnit)}>
+                {LENGTH_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {UNIT_LABELS[u]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <MaterialRows rows={rows} onChange={setRows} catalogue={flow.catalogue} unit={unit} />
+          <label className="flex min-h-11 items-start gap-3 rounded-lg bg-card p-3 text-sm">
+            <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" {...register("materialsAvailable")} />
+            <span>
+              <span className="block font-medium">These boards are in the workshop now</span>
+              <span className="block text-muted-foreground">Once the cutlist is approved, the job goes straight into the cutting queue.</span>
+            </span>
+          </label>
+          {woodPhotos}
+          <p className="text-xs text-muted-foreground">The cutlist opens in the same unit.</p>
+        </section>
       )}
+
+      {!editing && !flow && woodPhotos}
 
       {!editing && (
         <fieldset className="space-y-3">
@@ -265,18 +320,17 @@ export default function JobForm({
       <div className="flex gap-2">
         {flow && (
           <Button type="button" variant="outline" className="h-11" disabled={pending} onClick={flow.onBack}>
-            ← Back
+            ← Client
           </Button>
         )}
         <Button type="submit" disabled={pending} className="h-11">
           {progress ?? (pending ? "Saving…" : editing ? "Save changes" : flow ? "Create job, then cutlist →" : "Create job")}
         </Button>
-        <Link
-          href={existing ? `/admin/jobs/${existing.workNumber}` : "/admin/jobs"}
-          className={buttonVariants({ variant: "outline", className: "h-11" })}
-        >
-          Cancel
-        </Link>
+        {!flow && (
+          <Link href={existing ? `/admin/jobs/${existing.workNumber}` : "/admin/jobs"} className={buttonVariants({ variant: "outline", className: "h-11" })}>
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

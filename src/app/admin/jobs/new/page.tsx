@@ -5,12 +5,12 @@ import { requireRole } from "@/server/auth/guards";
 
 export const metadata: Metadata = { title: "New job | Pacwoods" };
 
-/** A new job in three steps: client and materials, job details, cutlist. */
+/** Where Admins land after signing in: the client, then the job and its materials, then the cutlist. */
 export default async function NewJobPage() {
   await requireRole("SUPER_ADMIN", "ADMIN");
   return (
     <>
-      <PageHeader title="New job" description="Who it is for and their boards, then the job, then the cutlist. The work number is assigned when you save." />
+      <PageHeader title="New job" description="The client, then the job with its materials, then the cutlist. The work number is assigned when you save the job." />
       <NewJobSection />
     </>
   );

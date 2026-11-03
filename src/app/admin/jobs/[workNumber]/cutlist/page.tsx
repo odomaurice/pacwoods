@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CutlistEditor, { type MaterialOption } from "@/components/cutlist/CutlistEditor";
-import JobSteps from "@/components/jobs/JobSteps";
 import PageHeader from "@/components/PageHeader";
 import { pickPart, pickStock, type CutlistInput } from "@/lib/cutlist";
 import { WORK_NUMBER_PATTERN } from "@/lib/numbers";
@@ -10,11 +9,12 @@ import { requireRole } from "@/server/auth/guards";
 import type { PreviewData } from "@/components/cutlist/PlanPreview";
 import { PART_FILLS } from "@/lib/plan-view";
 import { emptyCutlist, loadJobCutlist, planIsCurrent } from "@/server/services/cutlists";
+import { LENGTH_UNITS, type LengthUnit } from "@/lib/units";
 import { listMaterials } from "@/server/services/materials";
 
 export const metadata: Metadata = { title: "Cutlist | Pacwoods" };
 
-export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[workNumber]/cutlist">) {
+export default async function CutlistPage({ params, searchParams }: PageProps<"/admin/jobs/[workNumber]/cutlist">) {
   await requireRole("SUPER_ADMIN", "ADMIN");
   const { workNumber } = await params;
   if (!WORK_NUMBER_PATTERN.test(workNumber)) notFound();
@@ -38,7 +38,7 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
         stockSheets: current.stockSheets.map(pickStock),
         options: current.options,
       }
-    : await startingCutlist(job.materials ?? [], materials);
+    : await startingCutlist(job.materials ?? [], materials, unitParam((await searchParams).unit));
 
   const preview: PreviewData | null = current?.plan
     ? {
@@ -62,7 +62,6 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
           current ? `Version ${current.version}${current.state === "APPROVED" ? " · approved" : " · draft"}` : "Enter panels and stock sheets, then press ▶ to generate the cutting plan."
         }
       />
-      {job.status === "DRAFT" && <JobSteps current={3} />}
       <CutlistEditor workNumber={workNumber} initial={initial} materials={materials} readOnly={job.status !== "DRAFT"} preview={preview} cnc={Boolean(job.operations?.cnc)} />
     </>
   );
@@ -76,8 +75,10 @@ export default async function CutlistPage({ params }: PageProps<"/admin/jobs/[wo
 async function startingCutlist(
   recorded: Array<{ materialId?: unknown; sheetLengthMm?: number | null; sheetWidthMm?: number | null; sheets: number }>,
   catalogue: MaterialOption[],
+  unit?: LengthUnit,
 ): Promise<CutlistInput> {
-  const empty = await emptyCutlist();
+  const base = await emptyCutlist();
+  const empty = unit ? { ...base, options: { ...base.options, unit } } : base;
   const stockSheets = recorded
     .filter((m) => m.sheetLengthMm && m.sheetWidthMm)
     .map((m, i) => {
@@ -93,3 +94,5 @@ async function startingCutlist(
     });
   return { ...empty, stockSheets };
 }
+
+const unitParam = (v: string | string[] | undefined) => (LENGTH_UNITS as readonly string[]).includes(String(v)) ? (v as LengthUnit) : undefined;

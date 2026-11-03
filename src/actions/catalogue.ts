@@ -9,8 +9,8 @@ import { ServiceError } from "@/server/services/users";
 
 export type MaterialResult = { ok: true } | { ok: false; error: string };
 
-async function superAdmin() {
-  const user = await requireRole("SUPER_ADMIN");
+async function staff() {
+  const user = await requireRole("SUPER_ADMIN", "ADMIN");
   return { id: user.id, role: user.role, permissions: user.permissions };
 }
 
@@ -21,7 +21,7 @@ function failure(error: unknown): { ok: false; error: string } {
 }
 
 export async function createMaterialAction(input: MaterialInput): Promise<MaterialResult> {
-  const actor = await superAdmin();
+  const actor = await staff();
   try {
     await createMaterial(actor, input);
     revalidatePath("/admin/materials");
@@ -32,7 +32,7 @@ export async function createMaterialAction(input: MaterialInput): Promise<Materi
 }
 
 export async function setMaterialActiveAction(materialId: string, active: boolean): Promise<MaterialResult> {
-  const actor = await superAdmin();
+  const actor = await staff();
   try {
     await setMaterialActive(actor, materialId, active);
     revalidatePath("/admin/materials");
@@ -43,7 +43,7 @@ export async function setMaterialActiveAction(materialId: string, active: boolea
 }
 
 export async function addStandardMaterialsAction(): Promise<{ ok: true; added: number }> {
-  const actor = await superAdmin();
+  const actor = await staff();
   const added = await addStandardMaterials(actor.id);
   revalidatePath("/admin/materials");
   return { ok: true, added };

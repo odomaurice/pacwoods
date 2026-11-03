@@ -43,7 +43,7 @@ export default async function OperatorTaskPage({ params }: { params: Promise<{ i
       />
       {card && (
         <div className="mb-6">
-          <JobSummaryCard data={card.data} scanUrl={await scanUrl(card.qrToken)} stage={task.stage} />
+          <JobSummaryCard data={card.data} scanUrl={await scanUrl(card.qrToken)} />
         </div>
       )}
       {canAct && task.status !== "COMPLETED" && (

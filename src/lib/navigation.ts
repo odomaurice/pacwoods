@@ -1,4 +1,5 @@
 import {
+  AddSquareIcon,
   Briefcase01Icon,
   Alert02Icon,
   ChartIcon,
@@ -48,6 +49,7 @@ function baseNavigation(user: { role: Role; permissions: readonly Permission[] }
         {
           title: "Production",
           items: [
+            { href: "/admin/jobs/new", label: "New job", icon: AddSquareIcon },
             { href: "/admin/jobs", label: "Jobs", icon: Briefcase01Icon },
             { href: "/admin/queues", label: "Queues", icon: ListViewIcon },
             { href: "/admin/issues", label: "Issues", icon: Alert02Icon, badge: counts.openIssues || undefined },
@@ -110,7 +112,9 @@ export function tabsFor(user: { role: Role }, counts: { unread?: number } = {}):
     case "SUPER_ADMIN":
     case "ADMIN":
       return [
-        { href: "/admin", label: "Home", icon: DashboardSquare01Icon },
+        user.role === "ADMIN"
+          ? { href: "/admin/jobs/new", label: "New job", icon: AddSquareIcon }
+          : { href: "/admin", label: "Home", icon: DashboardSquare01Icon },
         { href: "/admin/jobs", label: "Jobs", icon: Briefcase01Icon },
         { href: "/admin/queues", label: "Queues", icon: ListViewIcon },
         alerts,

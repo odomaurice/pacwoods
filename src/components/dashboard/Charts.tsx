@@ -26,12 +26,12 @@ const PHASES: Array<{ name: string; color: string; statuses: JobStatus[] }> = [
 
 function ChartFrame({ title, description, children, table }: { title: string; description?: string; children: ReactNode; table: ReactNode }) {
   return (
-    <section className="flex flex-col rounded-lg bg-card p-5">
-      <h2 className="font-semibold">{title}</h2>
-      {description && <p className="mb-3 text-sm text-muted-foreground">{description}</p>}
+    <section className="flex flex-col panel p-6">
+      <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+      {description && <p className="mb-4 text-sm text-muted-foreground">{description}</p>}
       <div className="flex-1">{children}</div>
-      <details className="mt-3 text-sm">
-        <summary className="text-muted-foreground hover:text-foreground">Show as table</summary>
+      <details className="mt-4 text-sm">
+        <summary className="inline-flex cursor-pointer list-none items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">Show as table</summary>
         <div className="mt-2">{table}</div>
       </details>
     </section>
@@ -88,12 +88,13 @@ export function JobsSunburst({ byStatus }: { byStatus: Partial<Record<JobStatus,
         <p className="py-16 text-center text-sm text-muted-foreground">No jobs yet.</p>
       ) : (
         <div className="grid items-center gap-4 sm:grid-cols-[1fr_auto]">
-          <div className="mx-auto aspect-square w-full max-w-72">
+          <div className="mx-auto size-72">
+            {/* Fixed size: this chart does not size itself from percentages. The root needs
+                its own value too: segment angles are value / root value, NaN without it. */}
             <SunburstChart
-              responsive
-              width="100%"
-              height="100%"
-              data={{ name: "Jobs", children: phases }}
+              width={288}
+              height={288}
+              data={{ name: "Jobs", value: total, children: phases }}
               innerRadius={36}
               ringPadding={2}
               stroke="#ffffff"

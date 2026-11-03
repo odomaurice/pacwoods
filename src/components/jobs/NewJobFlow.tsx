@@ -1,99 +1,191 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "sonner";
+import { useState, useTransition } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Briefcase01Icon } from "@hugeicons/core-free-icons";
+import { lookupClientAction } from "@/actions/accounts";
 import ClientForm from "@/app/admin/clients/ClientForm";
 import JobForm from "@/app/admin/jobs/JobForm";
-import ClientPicker, { type PickerClient } from "@/components/jobs/ClientPicker";
-import JobSteps from "@/components/jobs/JobSteps";
-import MaterialRows, { readRows, toRow, type CatalogueOption, type MaterialRow } from "@/components/materials/MaterialRows";
+import type { CatalogueOption } from "@/components/materials/MaterialRows";
 import { Button } from "@/components/ui/button";
-import type { JobMaterialInput } from "@/lib/job-materials";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+type Found = NonNullable<Awaited<ReturnType<typeof lookupClientAction>>>;
+type Phase = "client" | "new-client" | "job";
+
+const labelOf = (c: { name: string; businessName?: string; clientNumber: string }) => `${c.businessName ? `${c.businessName} — ` : ""}${c.name} (${c.clientNumber})`;
 
 /**
- * Creating a job, in three steps on one screen:
- * 1. the client (picked or registered on the spot) and the boards for the job,
- * 2. the job details, saved together with those boards,
- * 3. the cutlist, on the new job's own page.
+ * Creating a job, one dialog at a time over a blurred page:
+ * 1. the client's phone or client number: a known client is shown to confirm,
+ *    an unknown one opens the new-client form with that number filled in;
+ * 2. the job, with its materials (in the unit of choice) and wood photos;
+ * then the job's cutlist opens. Closing a dialog keeps what was entered.
  */
-export default function NewJobFlow({ clients, catalogue, compactHeader = false }: { clients: PickerClient[]; catalogue: CatalogueOption[]; compactHeader?: boolean }) {
-  const [step, setStep] = useState<1 | 2>(1);
+export default function NewJobFlow({ catalogue }: { catalogue: CatalogueOption[] }) {
+  const [phase, setPhase] = useState<Phase>("client");
+  const [open, setOpen] = useState(true);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<Found | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [client, setClient] = useState<{ id: string; label: string } | null>(null);
-  const [rows, setRows] = useState<MaterialRow[]>(() => [toRow({})]);
-  const [inWorkshop, setInWorkshop] = useState(false);
-  const [materials, setMaterials] = useState<JobMaterialInput[]>([]);
+  const [pending, startTransition] = useTransition();
 
-  function toJobDetails() {
-    const read = readRows(rows);
-    if ("error" in read) {
-      toast.error(read.error);
-      return;
-    }
-    setMaterials(read.items);
-    setStep(2);
+  const go = (next: Phase) => {
+    setPhase(next);
+    setOpen(true);
+  };
+
+  function lookUp() {
+    const q = query.trim();
+    if (!q) return;
+    setNotFound(false);
+    setFound(null);
+    startTransition(async () => {
+      const result = await lookupClientAction(q);
+      if (result) setFound(result);
+      else {
+        setNotFound(true);
+        go("new-client");
+      }
+    });
   }
 
+  const looksLikePhone = /^[+0-9 ()-]{7,}$/.test(query.trim());
+
+  return (
+    <>
+      <section className="flex min-h-[50dvh] flex-col items-center justify-center gap-4 rounded-2xl bg-card p-8 text-center">
+        <span className="flex size-16 items-center justify-center rounded-full bg-brand-charcoal text-brand-gold" aria-hidden>
+          <HugeiconsIcon icon={Briefcase01Icon} className="size-8" />
+        </span>
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold">{client ? `New job for ${client.label}` : "Start a new job"}</h2>
+          <p className="text-sm text-muted-foreground">
+            {client ? "Carry on with the job details, its materials and photos." : "Begin with the client's phone number or client number."}
+          </p>
+        </div>
+        <Button variant="gold" className="h-12 rounded-full px-8 text-base" onClick={() => setOpen(true)}>
+          {client ? "Continue the job" : "Enter the client's number"}
+        </Button>
+      </section>
+
+      {/* 1. Who is it for? */}
+      <Dialog open={open && phase === "client"} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Who is this job for?</DialogTitle>
+            <DialogDescription>Enter the client&apos;s phone number or client number.</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                lookUp();
+              }}
+            >
+              <span className="flex-1 space-y-1">
+                <Label htmlFor="client-number" className="sr-only">
+                  Phone number or client number
+                </Label>
+                <Input
+                  id="client-number"
+                  autoFocus
+                  inputMode="tel"
+                  className="h-12 bg-card text-base"
+                  placeholder="e.g. 0803 123 4567 or PCL-000012"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setFound(null);
+                  }}
+                />
+              </span>
+              <Button type="submit" className="h-12 px-5" disabled={pending || !query.trim()}>
+                {pending ? "Finding…" : "Find"}
+              </Button>
+            </form>
+
+            {found && (
+              <div className="space-y-3 rounded-xl bg-accent p-4 duration-200 animate-in fade-in-0 slide-in-from-bottom-2">
+                <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+                  <Fact label="Name">{found.name}</Fact>
+                  {found.businessName && <Fact label="Business">{found.businessName}</Fact>}
+                  <Fact label="Client number">
+                    <span className="font-mono">{found.clientNumber}</span>
+                  </Fact>
+                  {found.phone && <Fact label="Phone">{found.phone}</Fact>}
+                  {found.email && <Fact label="Email">{found.email}</Fact>}
+                </dl>
+                {found.active ? (
+                  <Button
+                    variant="gold"
+                    className="h-11 w-full"
+                    onClick={() => {
+                      setClient({ id: found.id, label: labelOf(found) });
+                      go("job");
+                    }}
+                  >
+                    Continue: the job →
+                  </Button>
+                ) : (
+                  <p className="text-sm font-medium text-destructive">This client&apos;s account is not active, so a job cannot be created for them.</p>
+                )}
+              </div>
+            )}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* 1b. Not known yet: register them, with the number already filled in. */}
+      <Dialog open={open && phase === "new-client"} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>New client</DialogTitle>
+            <DialogDescription>
+              {notFound ? `No client has “${query.trim()}”. Register them to carry on with the job.` : "Register the client to carry on with the job."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <ClientForm
+              key={query}
+              initialPhone={looksLikePhone ? query.trim() : undefined}
+              onCreated={(c) => {
+                setClient(c);
+                go("job");
+              }}
+            />
+            <button type="button" onClick={() => go("client")} className="mt-4 cursor-pointer text-sm font-medium underline-offset-4 hover:underline">
+              ← Search for another number
+            </button>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. The job, its materials and photos. */}
+      <Dialog open={open && phase === "job" && client !== null} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>The job</DialogTitle>
+            <DialogDescription>What to do, the boards it uses and photos of the wood. Saving opens the cutlist.</DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            {client && <JobForm defaultClientId={client.id} chosenClient={client.label} flow={{ catalogue, onBack: () => go("client") }} />}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <JobSteps current={step} />
-
-      {step === 2 && client ? (
-        <JobForm defaultClientId={client.id} chosenClient={client.label} flow={{ materials, materialsAvailable: inWorkshop, onBack: () => setStep(1) }} />
-      ) : !client ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section aria-labelledby="existing" className="space-y-3">
-            <h2 id="existing" className={compactHeader ? "font-semibold" : "text-lg font-semibold"}>
-              An existing client
-            </h2>
-            {clients.length === 0 ? (
-              <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">No clients yet. Register the first one.</p>
-            ) : (
-              <ClientPicker clients={clients} onPick={(c) => setClient({ id: c.id, label: c.label })} />
-            )}
-          </section>
-          <section aria-labelledby="new-client" className="space-y-3">
-            <h2 id="new-client" className={compactHeader ? "font-semibold" : "text-lg font-semibold"}>
-              Or a new client
-            </h2>
-            <div className="rounded-lg bg-card p-5">
-              <ClientForm onCreated={setClient} />
-            </div>
-          </section>
-        </div>
-      ) : (
-        <div className="max-w-4xl space-y-5">
-          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-accent p-3 text-sm">
-            <span>
-              <span className="block text-muted-foreground">Client</span>
-              <span className="font-medium">{client.label}</span>
-            </span>
-            <button type="button" onClick={() => setClient(null)} className="ml-auto cursor-pointer text-sm font-medium underline-offset-4 hover:underline">
-              Change
-            </button>
-          </div>
-
-          <section aria-labelledby="boards" className="space-y-3">
-            <div>
-              <h2 id="boards" className="text-lg font-semibold">
-                Materials for this job
-              </h2>
-              <p className="text-sm text-muted-foreground">The boards the client is bringing or that come from stock. Not sure yet? Leave it empty and add them on the job later.</p>
-            </div>
-            <MaterialRows rows={rows} onChange={setRows} catalogue={catalogue} />
-            <label className="flex min-h-11 items-start gap-3 rounded-lg bg-card p-3 text-sm">
-              <input type="checkbox" className="mt-0.5 size-5 accent-brand-charcoal" checked={inWorkshop} onChange={(e) => setInWorkshop(e.target.checked)} />
-              <span>
-                <span className="block font-medium">These boards are in the workshop now</span>
-                <span className="block text-muted-foreground">Once the cutlist is approved, the job goes straight into the cutting queue.</span>
-              </span>
-            </label>
-          </section>
-
-          <Button variant="gold" className="h-11 px-6" onClick={toJobDetails}>
-            Continue: job details →
-          </Button>
-        </div>
-      )}
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{children}</dd>
     </div>
   );
 }

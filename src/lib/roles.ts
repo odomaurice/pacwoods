@@ -18,8 +18,10 @@ export const ROLE_LABELS: Record<Role, string> = {
 export function roleHome(role: Role): string {
   switch (role) {
     case "SUPER_ADMIN":
-    case "ADMIN":
       return "/admin";
+    case "ADMIN":
+      // Creating jobs is an Admin's main work; the overview is in the sidebar.
+      return "/admin/jobs/new";
     case "OPERATOR":
       return "/operator";
     case "CLIENT":

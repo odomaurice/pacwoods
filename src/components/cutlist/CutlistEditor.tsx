@@ -497,7 +497,7 @@ export default function CutlistEditor({
         </>
       )}
     </div>
-      <aside aria-label="Cutting plan preview" className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto [scrollbar-width:thin]">
+      <aside aria-label="Cutting plan preview" className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto scrollbar-thin">
         <PlanPreview workNumber={workNumber} data={preview} stale={dirty} />
       </aside>
 
@@ -586,7 +586,7 @@ function EntryRow({ error, children }: { error?: string; children: ReactNode }) 
 
 function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive">
+    <button type="button" aria-label={label} title={label} onClick={onClick} className="inline-flex size-10 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-destructive">
       <HugeiconsIcon icon={Delete02Icon} className="size-5" />
     </button>
   );

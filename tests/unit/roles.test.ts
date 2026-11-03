@@ -34,7 +34,8 @@ describe("canProvision", () => {
 describe("roleHome", () => {
   it("routes each role to its area", () => {
     expect(roleHome("SUPER_ADMIN")).toBe("/admin");
-    expect(roleHome("ADMIN")).toBe("/admin");
+    // Admins start on job creation; the overview stays in their sidebar.
+    expect(roleHome("ADMIN")).toBe("/admin/jobs/new");
     expect(roleHome("OPERATOR")).toBe("/operator");
     expect(roleHome("CLIENT")).toBe("/client");
   });

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, Cancel01Icon, LockPasswordIcon, Logout01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Cancel01Icon, Home01Icon, LockPasswordIcon, Logout01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { signOutAction } from "@/actions/auth";
 import InstallApp from "@/components/InstallApp";
 import { LogoMark } from "@/components/Logo";
@@ -23,7 +23,7 @@ const linkClass =
 
 function Wordmark() {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-white">
+    <Link href="/" title="Pacwoods website" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-white">
       <LogoMark className="h-8 w-auto" />
       <span>
         Pa<span className="text-brand-gold">C</span> WOODS
@@ -34,6 +34,8 @@ function Wordmark() {
 
 function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { onNavigate?: () => void }) {
   const pathname = usePathname();
+  // Only the closest match is lit (New job, not Jobs as well, on /admin/jobs/new).
+  const lit = currentItem(pathname, sections.flatMap((s) => s.items));
   return (
     <div className="flex h-full flex-col gap-6 px-3 py-5">
       <div className="px-3">
@@ -49,7 +51,7 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
               </p>
             )}
             {section.items.map((item) => {
-              const active = isActive(pathname, item.href);
+              const active = lit === item && isActive(pathname, item.href);
               return (
                 <Link
                   key={item.href}
@@ -79,6 +81,10 @@ function SidebarBody({ sections, userName, roleLabel, onNavigate }: Props & { on
           <p className="truncate text-sm font-medium text-white">{userName}</p>
           <p className="text-xs text-brand-gold">{roleLabel}</p>
         </div>
+        <Link href="/" onClick={onNavigate} className={linkClass}>
+          <HugeiconsIcon icon={Home01Icon} className="size-5" />
+          Pacwoods website
+        </Link>
         <Link href="/change-password" onClick={onNavigate} className={linkClass}>
           <HugeiconsIcon icon={LockPasswordIcon} className="size-5" />
           Change password
@@ -125,7 +131,7 @@ export default function Sidebar(props: Props) {
             <HugeiconsIcon icon={ArrowLeft01Icon} className="size-6" />
           </Link>
         ) : (
-          <Link href="/dashboard" aria-label="Pacwoods home" className="inline-flex size-11 items-center justify-center">
+          <Link href="/" aria-label="Pacwoods website" className="inline-flex size-11 items-center justify-center">
             <LogoMark className="h-7 w-auto" />
           </Link>
         )}

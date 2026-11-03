@@ -97,7 +97,7 @@ describe.skipIf(!hasDatabase)("clients, jobs and account management (MongoDB)", 
     await expect(resetPassword(root, other.user._id.toString())).resolves.toHaveProperty("temporaryPassword");
   });
 
-  it("lets only a Super Admin add materials", async () => {
+  it("lets Admins and Super Admins add materials, and nobody else", async () => {
     const input = {
       name: "MDF",
       category: "MDF",
@@ -106,8 +106,10 @@ describe.skipIf(!hasDatabase)("clients, jobs and account management (MongoDB)", 
       sheetLengthMm: 2440,
       sheetWidthMm: 1220,
     };
-    await expect(createMaterial(admin, input)).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(createMaterial(root, input)).resolves.toHaveProperty("name", "MDF");
+    const operator = { id: admin.id, role: "OPERATOR" as const, permissions: [] };
+    await expect(createMaterial(operator, input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(createMaterial(admin, input)).resolves.toHaveProperty("name", "MDF");
     await expect(createMaterial(root, input)).rejects.toMatchObject({ code: "DUPLICATE" });
+    await expect(createMaterial(root, { ...input, thicknessMm: 16 })).resolves.toHaveProperty("thicknessMm", 16);
   });
 });

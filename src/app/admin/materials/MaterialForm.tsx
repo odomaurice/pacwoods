@@ -10,8 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { materialSchema, type MaterialInput } from "@/lib/schemas";
+import { toMm, type LengthUnit } from "@/lib/units";
 
-export default function MaterialForm() {
+export default function MaterialForm({ unit = "mm" }: { /** The unit sizes are typed in; the catalogue stores millimetres. */ unit?: LengthUnit }) {
   const [serverError, setServerError] = useState<string>();
   const [pending, startTransition] = useTransition();
   const {
@@ -24,7 +25,12 @@ export default function MaterialForm() {
   const onSubmit = handleSubmit((values) => {
     setServerError(undefined);
     startTransition(async () => {
-      const result = await createMaterialAction(values);
+      const result = await createMaterialAction({
+        ...values,
+        thicknessMm: toMm(values.thicknessMm, unit),
+        sheetLengthMm: Math.round(toMm(values.sheetLengthMm, unit)),
+        sheetWidthMm: Math.round(toMm(values.sheetWidthMm, unit)),
+      });
       if (result.ok) {
         toast.success(`${values.name} added.`);
         reset({ grain: "NONE" });
@@ -37,7 +43,7 @@ export default function MaterialForm() {
   const num = { valueAsNumber: true } as const;
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-lg bg-card p-5">
+    <form onSubmit={onSubmit} noValidate className="space-y-5 panel p-6">
       <h2 className="font-semibold">Add a material</h2>
       {serverError && (
         <Alert variant="destructive">
@@ -47,9 +53,9 @@ export default function MaterialForm() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <FormField id="name" label="Name" placeholder="e.g. White melamine MDF" error={errors.name?.message} {...register("name")} />
         <FormField id="category" label="Category" placeholder="e.g. MDF, Plywood" error={errors.category?.message} {...register("category")} />
-        <FormField id="thicknessMm" label="Thickness (mm)" type="number" step="0.1" inputMode="decimal" error={errors.thicknessMm?.message} {...register("thicknessMm", num)} />
-        <FormField id="sheetLengthMm" label="Sheet length (mm)" type="number" inputMode="numeric" error={errors.sheetLengthMm?.message} {...register("sheetLengthMm", num)} />
-        <FormField id="sheetWidthMm" label="Sheet width (mm)" type="number" inputMode="numeric" error={errors.sheetWidthMm?.message} {...register("sheetWidthMm", num)} />
+        <FormField id="thicknessMm" label={`Thickness (${unit})`} type="number" step="any" inputMode="decimal" error={errors.thicknessMm?.message} {...register("thicknessMm", num)} />
+        <FormField id="sheetLengthMm" label={`Sheet length (${unit})`} type="number" step="any" inputMode="numeric" error={errors.sheetLengthMm?.message} {...register("sheetLengthMm", num)} />
+        <FormField id="sheetWidthMm" label={`Sheet width (${unit})`} type="number" step="any" inputMode="numeric" error={errors.sheetWidthMm?.message} {...register("sheetWidthMm", num)} />
         <div className="space-y-2">
           <Label htmlFor="grain">Grain</Label>
           <select id="grain" className="h-11 w-full rounded-md border border-input bg-card px-3 text-sm" {...register("grain")}>

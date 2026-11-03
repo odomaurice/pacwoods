@@ -15,9 +15,12 @@ import { clientAccountSchema, type ClientAccountInput } from "@/lib/schemas";
 
 export default function ClientForm({
   onCreated,
+  initialPhone,
 }: {
   /** Inside the new-job flow: carry on with this client instead of going back to the client list. */
   onCreated?: (client: { id: string; label: string }) => void;
+  /** Pre-filled, e.g. the number that was just searched for. */
+  initialPhone?: string;
 } = {}) {
   const wizard = Boolean(onCreated);
   const [created, setCreated] = useState<Extract<CreatedAccount, { ok: true }>>();
@@ -28,7 +31,7 @@ export default function ClientForm({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ClientAccountInput>({ resolver: zodResolver(clientAccountSchema) });
+  } = useForm<ClientAccountInput>({ resolver: zodResolver(clientAccountSchema), defaultValues: { phone: initialPhone ?? "" } });
 
   const onSubmit = handleSubmit((values) => {
     setServerError(undefined);
@@ -54,7 +57,7 @@ export default function ClientForm({
         />
         {onCreated && created.clientId && (
           <Button variant="gold" className="h-11 w-full" onClick={() => onCreated({ id: created.clientId!, label: `${created.name} (${created.clientNumber})` })}>
-            Continue: materials →
+            Continue: the job →
           </Button>
         )}
         <div className={wizard ? "hidden" : "flex flex-wrap gap-2"}>
@@ -111,9 +114,11 @@ export default function ClientForm({
         <Button type="submit" disabled={pending} className="h-11">
           {pending ? "Registering…" : "Register client"}
         </Button>
-        <Link href="/admin/clients" className={buttonVariants({ variant: "outline", className: "h-11" })}>
-          Cancel
-        </Link>
+        {!wizard && (
+          <Link href="/admin/clients" className={buttonVariants({ variant: "outline", className: "h-11" })}>
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

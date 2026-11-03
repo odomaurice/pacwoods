@@ -6,10 +6,6 @@ import { Job } from "@/server/db/models/Job";
 import { ProductionTask } from "@/server/db/models/ProductionTask";
 import { capabilitiesOf, operatorCanSee } from "@/server/services/production";
 
-/**
- * Where a scanned job QR code lands. The token is opaque; the job is only
- * revealed after sign-in, and only to someone allowed to see it.
- */
 export default async function ScanPage({ params }: PageProps<"/j/[token]">) {
   const user = await requireUser();
   const { token } = await params;

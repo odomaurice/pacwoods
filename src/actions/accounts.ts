@@ -14,6 +14,7 @@ import { formatPhone } from "@/lib/identity";
 import { requireRole } from "@/server/auth/guards";
 import {
   ServiceError,
+  findClientByNumber,
   provisionAccount,
   provisionClient,
   resetPassword,
@@ -94,4 +95,10 @@ export async function accountAction(input: AccountActionInput): Promise<AccountA
   } catch (error) {
     return failure(error);
   }
+}
+
+/** The new-job flow: who is this phone number or client number? */
+export async function lookupClientAction(query: string) {
+  await staffActor();
+  return findClientByNumber(String(query).slice(0, 40));
 }

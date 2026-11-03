@@ -7,10 +7,10 @@ import { Material } from "@/server/db/models/Material";
 import { audit } from "@/server/services/audit";
 import { ServiceError, type Actor } from "@/server/services/users";
 
-/** Only Super Admins edit the catalogue (proposal in the Phase 0 matrix). */
+/** Admins and Super Admins keep the catalogue (decided 2026-11-03). */
 function assertCanEdit(actor: Actor) {
-  if (actor.role !== "SUPER_ADMIN") {
-    throw new ServiceError("FORBIDDEN", "Only a Super Admin can change the material catalogue.");
+  if (actor.role !== "SUPER_ADMIN" && actor.role !== "ADMIN") {
+    throw new ServiceError("FORBIDDEN", "Only staff can change the material catalogue.");
   }
 }
 

@@ -43,7 +43,7 @@ export default function EdgePicker({
         role="group"
         aria-label="Edge banding"
       >
-        <div className="absolute inset-2 rounded-[2px] bg-muted" aria-hidden />
+        <div className="absolute inset-2 rounded-xs bg-muted" aria-hidden />
         {SIDES.map((side) => {
           const on = value[side.key];
           return (
